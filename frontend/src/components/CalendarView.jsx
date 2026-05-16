@@ -31,6 +31,7 @@ export const statusColors = {
 };
 
 const ROOM_COL_WIDTH = 80;
+const CURRENT_USER = 'Staff'; // change to your auth user name
 
 const isBlocked = (b) => b.status === 'blocked' || b.status === 'maintenance';
 
@@ -45,6 +46,125 @@ function formatUpdatedAt(ts) {
   if (diffHr  < 24) return `${diffHr}h ago`;
   if (diffDay <  7) return `${diffDay}d ago`;
   return format(d, 'd MMM yyyy, HH:mm');
+}
+
+function formatCommentTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const hh = d.getHours().toString().padStart(2,'0');
+  const mm = d.getMinutes().toString().padStart(2,'0');
+  const day = d.getDate().toString().padStart(2,'0');
+  const mon = d.toLocaleString('en', { month: 'short' });
+  return `${hh}:${mm} ${day} ${mon}`;
+}
+
+// ── Inline Comment Thread (used inside QuickEdit & NewBooking) ────────────────
+function InlineCommentThread({ comments = [], onChange }) {
+  const [draft, setDraft] = useState('');
+  const taRef = useRef(null);
+
+  const inp = {
+    width: '100%', padding: '5px 8px', borderRadius: 5,
+    border: '1px solid #ddd', fontSize: '0.74rem',
+    boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none',
+    resize: 'none', lineHeight: 1.5,
+  };
+
+  const addComment = () => {
+    const text = draft.trim();
+    if (!text) return;
+    const newC = {
+      id: `c-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+      author: CURRENT_USER,
+      text,
+      createdAt: new Date().toISOString(),
+      edited: false,
+    };
+    onChange([...comments, newC]);
+    setDraft('');
+    taRef.current?.focus();
+  };
+
+  const deleteComment = (id) => onChange(comments.filter(c => c.id !== id));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* Thread */}
+      {comments.length > 0 && (
+        <div style={{
+          maxHeight: 160, overflowY: 'auto',
+          border: '1px solid #e8eaed', borderRadius: 6,
+          background: '#fafafa',
+        }}>
+          {comments.map((c, i) => (
+            <div key={c.id} style={{
+              padding: '6px 10px',
+              borderBottom: i < comments.length - 1 ? '1px solid #f0f0f0' : 'none',
+              display: 'flex', gap: 7, alignItems: 'flex-start',
+            }}>
+              {/* Avatar */}
+              <div style={{
+                width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                background: '#1565c0', color: '#fff',
+                fontSize: '0.6rem', fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {c.author?.[0]?.toUpperCase() || 'S'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 1 }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.7rem', color: '#1a1a2e' }}>{c.author}</span>
+                  <span style={{ fontSize: '0.62rem', color: '#bbb' }}>{formatCommentTime(c.createdAt)}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.73rem', color: '#333', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {c.text}
+                </p>
+              </div>
+              {/* Delete — only own */}
+              {c.author === CURRENT_USER && (
+                <button
+                  onClick={() => deleteComment(c.id)}
+                  title="Delete"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '0.75rem', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
+                  onMouseEnter={e => e.currentTarget.style.color='#e74c3c'}
+                  onMouseLeave={e => e.currentTarget.style.color='#ccc'}
+                >✕</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Input row */}
+      <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end' }}>
+        <textarea
+          ref={taRef}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(); }}}
+          placeholder={comments.length ? 'Add another comment…' : 'Add a comment…'}
+          rows={2}
+          style={{ ...inp, flex: 1 }}
+        />
+        <button
+          onClick={addComment}
+          disabled={!draft.trim()}
+          style={{
+            padding: '5px 10px', border: 'none', borderRadius: 5,
+            background: draft.trim() ? '#1565c0' : '#b0c4de',
+            color: '#fff', fontSize: '0.7rem', fontWeight: 700,
+            cursor: draft.trim() ? 'pointer' : 'default',
+            flexShrink: 0, height: 52,
+          }}
+        >Post</button>
+      </div>
+      {comments.length > 0 && (
+        <div style={{ fontSize: '0.6rem', color: '#bbb', textAlign: 'right' }}>
+          {comments.length} comment{comments.length !== 1 ? 's' : ''}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Context Menu ──────────────────────────────────────────────────────────────
@@ -106,7 +226,14 @@ function BlockedHoverPopup({ booking, rect }) {
 // ── Booking Hover Popup ───────────────────────────────────────────────────────
 function BookingHoverPopup({ booking, rect }) {
   if (!rect) return null;
-  const popW = 250, popH = 230;
+
+  const comments = booking.comments || [];
+  // dynamic height: base + comments
+  const popW = 260;
+  const baseH = 230;
+  const commentsH = comments.length > 0 ? Math.min(comments.length * 52 + 48, 180) : 0;
+  const popH = baseH + commentsH;
+
   const vw = window.innerWidth, vh = window.innerHeight;
   let top = rect.bottom + 8, left = rect.left + rect.width / 2 - popW / 2;
   if (top + popH > vh - 8) top = rect.top - popH - 8;
@@ -144,16 +271,42 @@ function BookingHoverPopup({ booking, rect }) {
         ))}
       </div>
       <div style={{ padding: '7px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 10px' }}>
-        {[['Guests', booking.numGuests||1],['Meal', booking.mealPlan||'—'],['Source', booking.source||'—'],['Payment', booking.paymentStatus||'—'],
-          ...(booking.totalAmount ? [['Total', `₹${booking.totalAmount}`]] : []),
-          ...(booking.balance ? [['Balance', `₹${booking.balance}`]] : [])].map(([label, val]) => (
+        {[
+  ['Guests',  booking.numGuests||1],
+  ['Meal',    booking.mealPlan||'—'],
+  ['Source',  booking.source||'—'],
+  ...(booking.otaPlatform ? [['Platform', booking.otaPlatform]] : []),  // ← ADD
+  ...(booking.bookingId   ? [['Booking ID', booking.bookingId]] : []),  // ← ADD
+  ['Payment', booking.paymentStatus||'—'],
+  ...(booking.totalAmount ? [['Total', `₹${booking.totalAmount}`]] : []),
+  ...(booking.balance     ? [['Balance', `₹${booking.balance}`]]  : []),
+].map(([label, val]) => (
           <div key={label}>
             <span style={{ color: '#bbb', fontSize: '0.62rem' }}>{label}: </span>
             <span style={{ fontWeight: 600, color: label==='Payment'||label==='Balance' ? pc : '#1a1a2e', fontSize: '0.76rem', textTransform: 'capitalize' }}>{val}</span>
           </div>
         ))}
       </div>
-      {booking.notes && <div style={{ margin: '0 10px 8px', background: '#fffde7', border: '1px solid #ffe082', borderRadius: 5, padding: '4px 8px', fontSize: '0.7rem', color: '#6d4c00', fontStyle: 'italic' }}>📝 {booking.notes}</div>}
+
+      {/* ── Comments thread in hover popup ── */}
+      {comments.length > 0 && (
+        <div style={{ margin: '0 10px 8px', background: '#fffde7', border: '1px solid #ffe082', borderRadius: 6, overflow: 'hidden' }}>
+          {comments.map((c, i) => (
+            <div key={c.id} style={{ padding: '5px 8px', borderBottom: i < comments.length - 1 ? '1px solid #fff3c4' : 'none', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+              <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#1565c0', color: '#fff', fontSize: '0.55rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {c.author?.[0]?.toUpperCase() || 'S'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 1 }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#5d4037' }}>{c.author}</span>
+                  <span style={{ fontSize: '0.58rem', color: '#bbb' }}>{formatCommentTime(c.createdAt)}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.7rem', color: '#6d4c00', fontStyle: 'italic', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>,
     document.body
   );
@@ -161,13 +314,19 @@ function BookingHoverPopup({ booking, rect }) {
 
 // ── Quick Edit Popup ──────────────────────────────────────────────────────────
 function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
-  const [form, setForm] = useState({ ...booking });
+  const [form, setForm] = useState({ ...booking, comments: booking.comments || [] });
   if (!rect) return null;
-  const popW = 270, popH = 260;
+
+  const popW = 290;
+  // Dynamic height based on comment count
+  const commentRows = (form.comments || []).length;
+  const popH = 320 + Math.min(commentRows * 52, 160);
+
   const vw = window.innerWidth, vh = window.innerHeight;
   let top = rect.bottom + 8, left = rect.left + rect.width / 2 - popW / 2;
   if (top + popH > vh - 8) top = rect.top - popH - 8;
   left = Math.max(8, Math.min(left, vw - popW - 8));
+
   const inp = { width: '100%', padding: '4px 7px', borderRadius: 5, border: '1px solid #ddd', fontSize: '0.75rem', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' };
 
   return createPortal(
@@ -179,6 +338,7 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
           <span onClick={onClose} style={{ cursor: 'pointer', color: '#aaa', fontSize: '1.1rem', lineHeight: 1 }}>×</span>
         </div>
       </div>
+
       <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
         {isBlocked(booking) ? (
           <>
@@ -203,9 +363,25 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
                 {['paid','due','partial'].map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
-            <textarea value={form.notes||''} onChange={e => setForm(p=>({...p,notes:e.target.value}))} placeholder="Notes..." rows={2} style={{...inp,resize:'none'}} />
+
+            {/* ── Comment Thread ── */}
+            <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8, marginTop: 2 }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                💬 Comments
+                {form.comments.length > 0 && (
+                  <span style={{ background: '#1565c0', color: '#fff', borderRadius: 8, fontSize: '0.58rem', padding: '1px 5px', fontWeight: 700 }}>
+                    {form.comments.length}
+                  </span>
+                )}
+              </div>
+              <InlineCommentThread
+                comments={form.comments}
+                onChange={(updated) => setForm(p => ({ ...p, comments: updated }))}
+              />
+            </div>
           </>
         )}
+
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 2 }}>
           <button onClick={onClose} style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 5, background: '#191717', cursor: 'pointer', fontSize: '0.73rem' }}>Cancel</button>
           <button onClick={() => { onSave({...form, updatedAt: new Date().toISOString()}); onClose(); }} style={{ padding: '4px 14px', border: 'none', borderRadius: 5, background: '#1565c0', color: '#fff', cursor: 'pointer', fontSize: '0.73rem', fontWeight: 600 }}>Save</button>
@@ -218,9 +394,17 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
 
 // ── New Booking Popup ─────────────────────────────────────────────────────────
 function NewBookingPopup({ room, day, rect, onBook, onClose }) {
-  const [form, setForm] = useState({ guestName:'', phone:'', arrival:format(day,'yyyy-MM-dd'), departure:format(addDays(day,1),'yyyy-MM-dd'), mealPlan:'EP', status:'confirmed', paymentStatus:'paid', source:'direct', numGuests:1, notes:'' });
+  const [form, setForm] = useState({
+    guestName:'', phone:'',
+    arrival:format(day,'yyyy-MM-dd'),
+    departure:format(addDays(day,1),'yyyy-MM-dd'),
+    mealPlan:'EP', status:'confirmed', paymentStatus:'paid',
+    source:'direct', numGuests:1,
+    comments: [],  // ← threaded comments instead of notes
+  });
+
   if (!rect) return null;
-  const popW = 260, popH = 330;
+  const popW = 270, popH = 400;
   const vw = window.innerWidth, vh = window.innerHeight;
   let top = rect.bottom + 4, left = rect.left;
   if (top + popH > vh - 8) top = rect.top - popH - 4;
@@ -231,9 +415,13 @@ function NewBookingPopup({ room, day, rect, onBook, onClose }) {
   return createPortal(
     <div style={{ position:'fixed', top, left, width:popW, zIndex:999999, background:'#fff', border:'1px solid #d0d0d0', borderRadius:9, boxShadow:'0 8px 28px rgba(0,0,0,0.15)', fontFamily:'inherit', fontSize:'0.75rem', overflow:'hidden' }}>
       <div style={{ background:'#1565c0', padding:'7px 12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <div><span style={{ fontWeight:700, color:'#fff', fontSize:'0.82rem' }}>New Booking</span><span style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.7rem', marginLeft:6 }}>Room {room}</span></div>
+        <div>
+          <span style={{ fontWeight:700, color:'#fff', fontSize:'0.82rem' }}>New Booking</span>
+          <span style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.7rem', marginLeft:6 }}>Room {room}</span>
+        </div>
         <span onClick={onClose} style={{ cursor:'pointer', color:'rgba(255,255,255,0.7)', fontSize:'1.1rem', lineHeight:1 }}>×</span>
       </div>
+
       <div style={{ padding:'10px 12px', display:'flex', flexDirection:'column', gap:6 }}>
         <input value={form.guestName} onChange={e=>setForm(p=>({...p,guestName:e.target.value}))} placeholder="Guest name *" style={inp} autoFocus />
         <input value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} placeholder="Phone number" style={inp} />
@@ -250,10 +438,27 @@ function NewBookingPopup({ room, day, rect, onBook, onClose }) {
           <select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))} style={inp}>{['inquiry','tentative','confirmed'].map(s=><option key={s} value={s}>{s}</option>)}</select>
           <select value={form.source} onChange={e=>setForm(p=>({...p,source:e.target.value}))} style={inp}>{['direct','OTA','agent','walkin'].map(s=><option key={s} value={s}>{s}</option>)}</select>
         </div>
-        <textarea value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} placeholder="Notes..." rows={2} style={{...inp,resize:'none'}} />
+
+        {/* ── Inline comment thread ── */}
+        <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 7, marginTop: 1 }}>
+          <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#888', marginBottom: 5 }}>💬 Comments (optional)</div>
+          <InlineCommentThread
+            comments={form.comments}
+            onChange={(updated) => setForm(p => ({ ...p, comments: updated }))}
+          />
+        </div>
+
         <div style={{ display:'flex', gap:6, justifyContent:'flex-end', marginTop:2 }}>
           <button onClick={onClose} style={{ padding:'4px 12px', border:'1px solid #ddd', borderRadius:5, background:'#211f1f', cursor:'pointer', fontSize:'0.73rem' }}>Cancel</button>
-          <button onClick={() => { if(form.guestName.trim()){onBook({...form,updatedAt:new Date().toISOString()});onClose();}}} style={{ padding:'4px 14px', border:'none', borderRadius:5, background:'#1565c0', color:'#fff', cursor:'pointer', fontSize:'0.73rem', fontWeight:600 }}>Book</button>
+          <button
+            onClick={() => {
+              if(form.guestName.trim()){
+                onBook({...form, updatedAt:new Date().toISOString()});
+                onClose();
+              }
+            }}
+            style={{ padding:'4px 14px', border:'none', borderRadius:5, background:'#1565c0', color:'#fff', cursor:'pointer', fontSize:'0.73rem', fontWeight:600 }}
+          >Book</button>
         </div>
       </div>
     </div>,
@@ -291,6 +496,7 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingClic
             {isBlocked(booking) ? <span style={{ opacity:0.9, fontStyle:'italic' }}>🚫 {booking.notes||'Blocked'}</span> : <>{booking.tags?.includes('VIP')&&<span style={{marginRight:3}}>⭐</span>}{booking.tags?.includes('DND')&&<span style={{marginRight:3}}>🔕</span>}{booking.guestName}</>}
           </div>
           {payTag && <div style={{ position:'absolute', top:0, right:1, background:payTag.bg, color:payTag.text, fontSize:'0.5rem', fontWeight:700, padding:'1px 3px', borderRadius:'0 2px 2px 2px', textTransform:'uppercase', lineHeight:1.5 }}>{booking.paymentStatus}</div>}
+
         </div>
       </Rnd>
       {hovering && !editing && (isBlocked(booking) ? <BlockedHoverPopup booking={booking} rect={anchorRect} /> : <BookingHoverPopup booking={booking} rect={anchorRect} />)}
@@ -324,7 +530,6 @@ function CalendarView({ rooms, bookings=[], selectedDate, categoryColors={}, onC
       return d >= new Date(b.arrival) && d < new Date(b.departure);
     });
 
-  // ── Overlap checks ──────────────────────────────────────────────────────────
   function isOverlap(newItem, ignoreId=null) {
     const arr1=new Date(newItem.arrival), dep1=new Date(newItem.departure);
     return bookings.some(b => {
@@ -344,7 +549,6 @@ function CalendarView({ rooms, bookings=[], selectedDate, categoryColors={}, onC
     onQuickBook(data);
   }
 
-  // ── Daily occupancy calculation ─────────────────────────────────────────────
   const getDayOccupancy = (day) => {
     const dateStr = format(day, 'yyyy-MM-dd');
     const d = new Date(dateStr);
@@ -358,7 +562,6 @@ function CalendarView({ rooms, bookings=[], selectedDate, categoryColors={}, onC
     return { occupied, rate: rooms.length > 0 ? Math.round((occupied / rooms.length) * 100) : 0 };
   };
 
-  // ── Category available count per day ────────────────────────────────────────
   const getCatAvailableOnDay = (cat, day) => {
     const catRooms = rooms.filter(r => r.category === cat);
     const d = new Date(format(day, 'yyyy-MM-dd'));
@@ -372,26 +575,25 @@ function CalendarView({ rooms, bookings=[], selectedDate, categoryColors={}, onC
     return catRooms.length - occupied;
   };
 
-  // ── Build grouped rows: rooms grouped by category with Total row after each ─
- // ── Build grouped rows sorted by category room count ascending ────────────────
-const catCount = {};
-rooms.forEach(r => { catCount[r.category] = (catCount[r.category] || 0) + 1; });
+  const catCount = {};
+  rooms.forEach(r => { catCount[r.category] = (catCount[r.category] || 0) + 1; });
 
-const sortedCategories = Object.keys(categoryColors)
-  .filter(cat => rooms.some(r => r.category === cat))
-  .sort((a, b) => {
-    const diff = (catCount[a] || 0) - (catCount[b] || 0);
-    if (diff !== 0) return diff;
-    return a.localeCompare(b);
+  const sortedCategories = Object.keys(categoryColors)
+    .filter(cat => rooms.some(r => r.category === cat))
+    .sort((a, b) => {
+      const diff = (catCount[a] || 0) - (catCount[b] || 0);
+      if (diff !== 0) return diff;
+      return a.localeCompare(b);
+    });
+
+  const groupedRows = [];
+  sortedCategories.forEach(cat => {
+    const catRooms = [...rooms.filter(r => r.category === cat)]
+      .sort((a, b) => parseInt(a.name) - parseInt(b.name));
+    catRooms.forEach(r => groupedRows.push({ type: 'room', room: r }));
+    groupedRows.push({ type: 'total', category: cat });
   });
 
-const groupedRows = [];
-sortedCategories.forEach(cat => {
-  const catRooms = [...rooms.filter(r => r.category === cat)]
-    .sort((a, b) => parseInt(a.name) - parseInt(b.name));
-  catRooms.forEach(r => groupedRows.push({ type: 'room', room: r }));
-  groupedRows.push({ type: 'total', category: cat });
-});
   const hideScrollbar = { scrollbarWidth:'none', msOverflowStyle:'none' };
 
   return (
@@ -414,8 +616,8 @@ sortedCategories.forEach(cat => {
             })}
           </div>
 
-          {/* ── Grouped Room Rows + Category Total Rows ── */}
-          {groupedRows.map((row, idx) => {
+          {/* ── Grouped Room Rows ── */}
+          {groupedRows.map((row) => {
             if (row.type === 'room') {
               const room = row.room;
               const roomColor = categoryColors[room.category] || { bg:'#f5f5f5', border:'#9e9e9e' };
@@ -425,7 +627,7 @@ sortedCategories.forEach(cat => {
                     <span style={{ fontWeight:700, fontSize:'0.74rem', color:'#1a1a2e' }}>{room.name}</span>
                   </div>
                   <div style={{ display:'flex', flex:1, position:'relative', height:'100%' }}>
-                    {days.map((day, colIdx) => {
+                    {days.map((day) => {
                       const isToday=isSameDay(day,new Date()), isWeekend=day.getDay()===0||day.getDay()===6;
                       const occupied=hasBookingOnDay(room.name,day);
                       return (
@@ -453,7 +655,6 @@ sortedCategories.forEach(cat => {
               );
             }
 
-            // ── Category TOTAL row ────────────────────────────────────────────
             if (row.type === 'total') {
               const cat = row.category;
               const roomColor = categoryColors[cat] || { bg:'#f5f5f5', border:'#9e9e9e' };
@@ -483,7 +684,7 @@ sortedCategories.forEach(cat => {
             return null;
           })}
 
-          {/* ── Daily Occupancy Footer Row ── */}
+          {/* ── Daily Occupancy Footer ── */}
           <div style={{ position:'sticky', bottom:0, zIndex:100, display:'flex', height:36, background:'#1a1a2e', borderTop:'2px solid #b8bcc4' }}>
             <div style={{ width:ROOM_COL_WIDTH, minWidth:ROOM_COL_WIDTH, flexShrink:0, borderRight:'3px solid #444', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:1 }}>
               <span style={{ fontSize:'0.55rem', fontWeight:800, color:'#aaa', textTransform:'uppercase', letterSpacing:'0.08em' }}>Occupancy</span>
@@ -507,7 +708,7 @@ sortedCategories.forEach(cat => {
 
       {cellPopup && (
         <NewBookingPopup room={cellPopup.room} day={cellPopup.day} rect={cellPopup.rect}
-          onBook={data => { handleQuickBook({...data,roomName:cellPopup.room,id:`b${Date.now()}`}); setCellPopup(null); }}
+          onBook={data => { handleQuickBook({...data, roomName:cellPopup.room, id:`b${Date.now()}`}); setCellPopup(null); }}
           onClose={() => setCellPopup(null)} />
       )}
       {contextMenu && (

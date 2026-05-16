@@ -105,14 +105,15 @@ function App() {
 
   // Hide cancelled bookings unless filter is set to 'cancelled'
   const filteredBookings = bookings.filter(b => {
-    const matchStatus = filterStatus === 'all' || b.status === filterStatus;
-    const matchSearch = !searchQuery ||
-      b.guestName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.roomName?.includes(searchQuery);
-    // If filter is not 'cancelled', hide cancelled bookings
-    if (filterStatus !== 'cancelled' && b.status === 'cancelled') return false;
-    return matchStatus && matchSearch;
-  });
+  const matchStatus = filterStatus === 'all' || b.status === filterStatus;
+  const matchSearch = !searchQuery ||
+    b.guestName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    b.roomName?.includes(searchQuery) ||
+    b.bookingId?.toLowerCase().includes(searchQuery.toLowerCase()) || // ← ADD THIS
+    b.otaPlatform?.toLowerCase().includes(searchQuery.toLowerCase()); // ← ADD THIS
+  if (filterStatus !== 'cancelled' && b.status === 'cancelled') return false;
+  return matchStatus && matchSearch;
+});
 
   // ── Add Room ────────────────────────────────────────────────────────────────
   const handleAddRoomSubmit = (e) => {
@@ -273,7 +274,7 @@ const checkoutsToday = validBookings.filter(b => b.departure === todayStr && !['
           </div>
           <input
             value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-            placeholder="🔍 Search guest / room..."
+            placeholder="🔍 Search guest / room / booking ID..."
             style={{ ...inp, width: 180, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '0.75rem', padding: '4px 10px' }}
           />
         </div>
