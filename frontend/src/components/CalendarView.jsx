@@ -1,7 +1,9 @@
 import { addDays, format, startOfMonth, getDaysInMonth, isSameDay, isBefore, isAfter } from 'date-fns';
 import React, { useState, useRef, useEffect } from 'react';
+import CategoryMonthlySummary from './CategoryMonthlySummary';
 import { createPortal } from 'react-dom';
 import { Rnd } from 'react-rnd';
+
 
 function buildMonthDays(baseDate) {
   const start = startOfMonth(baseDate);
@@ -25,6 +27,7 @@ export const statusColors = {
   payment_due:  { bg: '#ca6f1e', text: '#fff' },
   vip:          { bg: '#6c3483', text: '#fff' },
   dnd:          { bg: '#5d6d7e', text: '#fff' },
+  dnc: { bg: '#c0392b', text: '#fff' },
   inquiry:      { bg: '#2e86c1', text: '#fff' },
   blocked:      { bg: '#4a4a4a', text: '#fff' },
   maintenance:  { bg: '#784212', text: '#fff' },
@@ -32,6 +35,7 @@ export const statusColors = {
 
 const ROOM_COL_WIDTH = 80;
 const CURRENT_USER = 'Staff'; // change to your auth user name
+const IS_ADMIN = CURRENT_USER === 'Admin'; // Replace with real admin check
 
 const isBlocked = (b) => b.status === 'blocked' || b.status === 'maintenance';
 
@@ -239,7 +243,7 @@ function BookingHoverPopup({ booking, rect }) {
   if (top + popH > vh - 8) top = rect.top - popH - 8;
   left = Math.max(8, Math.min(left, vw - popW - 8));
 
-  const sc = statusColors[booking.status] || statusColors.confirmed;
+  const sc = paymentTagColors[booking.paymentStatus] || paymentTagColors.due;
   const pc = booking.paymentStatus === 'paid' ? '#27ae60' : booking.paymentStatus === 'due' ? '#e74c3c' : booking.paymentStatus === 'partial' ? '#e67e22' : '#666';
   const nights = booking.arrival && booking.departure ? Math.round((new Date(booking.departure) - new Date(booking.arrival)) / 86400000) : '—';
   let timestampStr = '';
@@ -260,30 +264,64 @@ function BookingHoverPopup({ booking, rect }) {
           {booking.paymentStatus && <div style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '0.6rem', fontWeight: 700, padding: '2px 7px', borderRadius: 8, textTransform: 'uppercase' }}>{booking.paymentStatus}</div>}
           {booking.tags?.includes('VIP') && <div style={{ background: '#6c3483', color: '#fff', fontSize: '0.58rem', padding: '1px 6px', borderRadius: 6, fontWeight: 700 }}>VIP</div>}
           {booking.tags?.includes('DND') && <div style={{ background: '#5d6d7e', color: '#fff', fontSize: '0.58rem', padding: '1px 6px', borderRadius: 6, fontWeight: 700 }}>DND</div>}
+          {booking.dnc && (
+  <div
+    style={{
+      background: '#c0392b',
+      color: '#fff',
+      fontSize: '0.58rem',
+      padding: '1px 6px',
+      borderRadius: 6,
+      fontWeight: 700
+    }}
+  >
+    DNC
+  </div>
+)}
         </div>
       </div>
       <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
         {[['Check-in', booking.arrival],['Check-out', booking.departure]].map(([label, val], i) => (
           <div key={label} style={{ flex: 1, padding: '6px 10px', borderRight: i === 0 ? '1px solid #f0f0f0' : 'none' }}>
-            <div style={{ color: '#aaa', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>{label}</div>
+            <div style={{ color: '#392aaa', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>{label}</div>
             <div style={{ fontWeight: 700, color: '#1a1a2e', fontSize: '0.8rem' }}>{val}</div>
           </div>
         ))}
       </div>
       <div style={{ padding: '7px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 10px' }}>
         {[
-  ['Guests',  booking.numGuests||1],
-  ['Meal',    booking.mealPlan||'—'],
-  ['Source',  booking.source||'—'],
-  ...(booking.otaPlatform ? [['Platform', booking.otaPlatform]] : []),  // ← ADD
-  ...(booking.bookingId   ? [['Booking ID', booking.bookingId]] : []),  // ← ADD
-  ['Payment', booking.paymentStatus||'—'],
-  ...(booking.totalAmount ? [['Total', `₹${booking.totalAmount}`]] : []),
-  ...(booking.balance     ? [['Balance', `₹${booking.balance}`]]  : []),
+  ['Guests', booking.numGuests || 1],
+  ['Nationality', booking.nationality || '—'],
+  ['Meal', booking.mealPlan || '—'],
+  ['Source', booking.source || '—'],
+
+  ...(booking.otaPlatform
+    ? [['Platform', booking.otaPlatform]]
+    : []),
+
+  ...(booking.bookingId
+    ? [['Booking ID', booking.bookingId]]
+    : []),
+
+  ...(booking.advanceParticulars
+    ? [['Advance Paid', `₹${booking.advanceParticulars}`]]
+    : []),
+
+  ...(booking.totalAmount
+    ? [['Total', `₹${booking.totalAmount}`]]
+    : []),
+
+  ...(booking.balance
+    ? [['Balance Due', `₹${booking.balance}`]]
+    : []),
 ].map(([label, val]) => (
           <div key={label}>
-            <span style={{ color: '#bbb', fontSize: '0.62rem' }}>{label}: </span>
-            <span style={{ fontWeight: 600, color: label==='Payment'||label==='Balance' ? pc : '#1a1a2e', fontSize: '0.76rem', textTransform: 'capitalize' }}>{val}</span>
+            <span style={{ color: '#605959', fontSize: '0.62rem' }}>{label}: </span>
+            <span style={{ fontWeight: 600,color:
+  label === 'Payment' ||
+  label === 'Balance Due'
+    ? pc
+    : '#1a1a2e',fontSize: '0.76rem', textTransform: 'capitalize' }}>{val}</span>
           </div>
         ))}
       </div>
@@ -334,7 +372,7 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
       <div style={{ background: '#f7f8fa', padding: '7px 11px', borderBottom: '1px solid #e8e8e8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontWeight: 700, color: '#1a1a2e', fontSize: '0.8rem' }}>{isBlocked(booking) ? '🚫 Edit Block' : 'Quick Edit'}</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {!isBlocked(booking) && <span onClick={onFullEdit} style={{ cursor: 'pointer', color: '#1976d2', fontSize: '0.7rem', fontWeight: 600 }}>Full Edit →</span>}
+          {!isBlocked(booking) && <span onClick={() => onFullEdit(booking)} style={{ cursor: 'pointer', color: '#1976d2', fontSize: '0.7rem', fontWeight: 600 }}>Full Edit →</span>}
           <span onClick={onClose} style={{ cursor: 'pointer', color: '#aaa', fontSize: '1.1rem', lineHeight: 1 }}>×</span>
         </div>
       </div>
@@ -350,6 +388,21 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
           </>
         ) : (
           <>
+          {booking.dnc && (
+  <div
+    style={{
+      background: '#fdecea',
+      border: '1px solid #f5b7b1',
+      color: '#c0392b',
+      padding: '8px 10px',
+      borderRadius: 6,
+      fontSize: '0.72rem',
+      fontWeight: 700
+    }}
+  >
+    ⛔ DNC Guest — restricted handling
+  </div>
+)}
             <input value={form.guestName||''} onChange={e => setForm(p=>({...p,guestName:e.target.value}))} placeholder="Guest name" style={inp} autoFocus />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <input type="date" value={form.arrival||''} onChange={e => setForm(p=>({...p,arrival:e.target.value}))} style={inp} />
@@ -473,7 +526,9 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingClic
   const [anchorRect, setAnchorRect] = useState(null);
   const barRef = useRef(null), hoverTimer = useRef(null);
   const dep   = new Date(booking.departure);
-  const color = statusColors[booking.status] || statusColors.confirmed;
+  const color = isBlocked(booking)
+  ? statusColors.blocked
+  : paymentTagColors[booking.paymentStatus] || paymentTagColors.due;
   const payTag = !isBlocked(booking) ? paymentTagColors[booking.paymentStatus] : null;
 
   const startHover = () => { hoverTimer.current = setTimeout(() => { if(!editing){setAnchorRect(barRef.current?.getBoundingClientRect());setHovering(true);} }, 220); };
@@ -494,23 +549,63 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingClic
           onContextMenu={(e)=>{e.preventDefault();e.stopPropagation();stopHover();onContextMenu?.(e,booking);}}>
           <div style={{ width:'100%', height:'100%', ...blockedStyle, ...(!isBlocked(booking)?{background:color.bg}:{}), color:color.text, borderRadius:2, display:'flex', alignItems:'center', fontWeight:isBlocked(booking)?500:600, fontSize:'0.68rem', overflow:'hidden', whiteSpace:'nowrap', cursor:'pointer', padding:'0 6px', boxShadow:hovering?'0 2px 10px rgba(0,0,0,0.25)':'0 1px 3px rgba(0,0,0,0.12)', transition:'box-shadow 0.12s', border:isBlocked(booking)?'1px solid #333':'none' }}>
             {isBlocked(booking) ? <span style={{ opacity:0.9, fontStyle:'italic' }}>🚫 {booking.notes||'Blocked'}</span> : <>{booking.tags?.includes('VIP')&&<span style={{marginRight:3}}>⭐</span>}{booking.tags?.includes('DND')&&<span style={{marginRight:3}}>🔕</span>}{booking.guestName}</>}
+            
+            {booking.dnc && (
+  <div
+    style={{
+      fontSize: '0.65rem',
+      fontWeight: 700,
+      color: '#fff',
+      background: '#c0392b',
+      padding: '12px 12px',
+      borderRadius: 4,
+      marginTop: 4,
+    
+    }}
+  >
+    ⛔ 
+  </div>
+)}
           </div>
-          {payTag && <div style={{ position:'absolute', top:0, right:1, background:payTag.bg, color:payTag.text, fontSize:'0.5rem', fontWeight:700, padding:'1px 3px', borderRadius:'0 2px 2px 2px', textTransform:'uppercase', lineHeight:1.5 }}>{booking.paymentStatus}</div>}
+          
 
         </div>
       </Rnd>
       {hovering && !editing && (isBlocked(booking) ? <BlockedHoverPopup booking={booking} rect={anchorRect} /> : <BookingHoverPopup booking={booking} rect={anchorRect} />)}
-      {editing && <QuickEditPopup booking={booking} rect={anchorRect} onSave={(u)=>onUpdateBooking(booking.id,{...u,updatedAt:new Date().toISOString()})} onClose={()=>{setEditing(false);setHovering(false);}} onFullEdit={()=>{setEditing(false);onBookingDoubleClick?.(booking);}} />}
+     {editing && <QuickEditPopup
+  booking={booking}
+  rect={anchorRect}
+  onSave={(u)=>onUpdateBooking(booking.id,{...u,updatedAt:new Date().toISOString()})}
+  onClose={()=>{setEditing(false);setHovering(false);}}
+  onFullEdit={(booking) => {
+    setEditing(false);
+    setHovering(false);
+    onBookingDoubleClick?.(booking);
+  }}
+/>}
     </>
   );
 }
 
 // ── Main CalendarView ─────────────────────────────────────────────────────────
-function CalendarView({ rooms, bookings=[], selectedDate, categoryColors={}, onCellClick, onBookingClick, onBookingDoubleClick, onUpdateBooking, onQuickBook, onContextAction }) {
+function CalendarView({
+  rooms,
+  bookings = [],
+  selectedDate,
+  categoryColors = {},
+  onCellClick,
+  onBookingClick,
+  onBookingDoubleClick,
+  onUpdateBooking,
+  onQuickBook,
+  onContextAction,
+  requestDncOverride
+}) {
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(window.innerWidth);
   const [cellPopup,   setCellPopup]   = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  
 
   useEffect(() => {
     const obs = new ResizeObserver(entries => { for(const e of entries) setContainerWidth(e.contentRect.width); });
@@ -539,41 +634,57 @@ function CalendarView({ rooms, bookings=[], selectedDate, categoryColors={}, onC
       return arr1<dep2 && arr2<dep1 && !['cancelled','no-show'].includes(b.status);
     });
   }
-  function handleUpdateBooking(id, updates) {
-    const cur = bookings.find(b=>b.id===id); if(!cur) return;
-    if(isOverlap({...cur,...updates},id)){window.alert('Overlap!');return;}
-    onUpdateBooking(id, updates);
-  }
-  function handleQuickBook(data) {
-    if(isOverlap(data)){window.alert('Overlap!');return;}
-    onQuickBook(data);
+function handleUpdateBooking(id, updates) {
+  const cur = bookings.find(b => b.id === id);
+  if (!cur) return;
+
+  const roomChanging =
+    updates.roomName &&
+    updates.roomName !== cur.roomName;
+
+  if (cur.dnc && roomChanging) {
+    requestDncOverride?.(
+      cur,
+      {
+        name: updates.roomName
+      }
+    );
+    return;
   }
 
-  const getDayOccupancy = (day) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
-    const d = new Date(dateStr);
-    const occupied = rooms.filter(r =>
-      bookings.some(b =>
-        b.roomName === r.name &&
-        new Date(b.arrival) <= d && new Date(b.departure) > d &&
-        !['cancelled','no-show','blocked'].includes(b.status)
-      )
-    ).length;
-    return { occupied, rate: rooms.length > 0 ? Math.round((occupied / rooms.length) * 100) : 0 };
-  };
+  if (isOverlap({ ...cur, ...updates }, id)) {
+    window.alert('Overlap!');
+    return;
+  }
+
+  onUpdateBooking(id, updates);
+}
+
+ const getDayOccupancy = (day) => {
+  const dateStr = format(day, 'yyyy-MM-dd');
+  const d = new Date(dateStr);
+  const occupied = rooms.filter(r =>
+    bookings.some(b =>
+      b.roomName === r.name &&
+      new Date(b.arrival) <= d && new Date(b.departure) > d &&
+      !['cancelled', 'no-show'].includes(b.status) // ← removed 'blocked' from exclude list
+    )
+  ).length;
+  return { occupied, rate: rooms.length > 0 ? Math.round((occupied / rooms.length) * 100) : 0 };
+};
 
   const getCatAvailableOnDay = (cat, day) => {
-    const catRooms = rooms.filter(r => r.category === cat);
-    const d = new Date(format(day, 'yyyy-MM-dd'));
-    const occupied = catRooms.filter(r =>
-      bookings.some(b =>
-        b.roomName === r.name &&
-        new Date(b.arrival) <= d && new Date(b.departure) > d &&
-        !['cancelled','no-show','blocked'].includes(b.status)
-      )
-    ).length;
-    return catRooms.length - occupied;
-  };
+  const catRooms = rooms.filter(r => r.category === cat);
+  const d = new Date(format(day, 'yyyy-MM-dd'));
+  const occupied = catRooms.filter(r =>
+    bookings.some(b =>
+      b.roomName === r.name &&
+      new Date(b.arrival) <= d && new Date(b.departure) > d &&
+      !['cancelled', 'no-show'].includes(b.status) // ← removed 'blocked' from exclude list
+    )
+  ).length;
+  return catRooms.length - occupied;
+};
 
   const catCount = {};
   rooms.forEach(r => { catCount[r.category] = (catCount[r.category] || 0) + 1; });
@@ -596,8 +707,11 @@ function CalendarView({ rooms, bookings=[], selectedDate, categoryColors={}, onC
 
   const hideScrollbar = { scrollbarWidth:'none', msOverflowStyle:'none' };
 
+
+
   return (
     <div ref={containerRef} style={{ flex:1, overflow:'hidden', border:'1px solid #c8cacf', borderRadius:6, background:'#fff', display:'flex', flexDirection:'column', height:'100%' }}>
+      
       <style>{`.cal-scroll::-webkit-scrollbar{display:none}`}</style>
       <div className="cal-scroll" style={{ flex:1, overflowY:'auto', overflowX:'hidden', ...hideScrollbar }}>
         <div style={{ width:'100%', minWidth:days.length*cellWidth+ROOM_COL_WIDTH }}>
@@ -632,7 +746,11 @@ function CalendarView({ rooms, bookings=[], selectedDate, categoryColors={}, onC
                       const occupied=hasBookingOnDay(room.name,day);
                       return (
                         <div key={format(day,'yyyy-MM-dd')} style={{ width:cellWidth, minWidth:cellWidth, maxWidth:cellWidth, height:'100%', flexShrink:0, borderRight:'1px solid rgba(0,0,0,0.07)', cursor:occupied?'default':'pointer', zIndex:1, background:isToday?'rgba(21,101,192,0.10)':isWeekend?'rgba(0,0,0,0.04)':'transparent' }}
-                          onClick={e => { if(!occupied) setCellPopup({ room:room.name, day, rect:e.currentTarget.getBoundingClientRect() }); }} />
+                          onClick={(e) => {
+  if (!occupied) {
+    onCellClick(room.name, day); // directly open big form
+  }
+}} />
                       );
                     })}
                     {getRoomBookings(room.name).map(booking => {
@@ -702,15 +820,15 @@ function CalendarView({ rooms, bookings=[], selectedDate, categoryColors={}, onC
               );
             })}
           </div>
-
         </div>
       </div>
+<CategoryMonthlySummary
+  rooms={rooms}
+  bookings={bookings}
+  selectedDate={selectedDate}
+  categoryColors={categoryColors}
+/>
 
-      {cellPopup && (
-        <NewBookingPopup room={cellPopup.room} day={cellPopup.day} rect={cellPopup.rect}
-          onBook={data => { handleQuickBook({...data, roomName:cellPopup.room, id:`b${Date.now()}`}); setCellPopup(null); }}
-          onClose={() => setCellPopup(null)} />
-      )}
       {contextMenu && (
         <ContextMenu x={contextMenu.x} y={contextMenu.y} booking={contextMenu.booking}
           onAction={(action,booking) => onContextAction?.(action,booking)}

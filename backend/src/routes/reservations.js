@@ -41,6 +41,7 @@ router.post(
         base_rate,
         total_amount,
         paid_amount,
+        payment_mode,
         notes,
         tags,
       } = req.body;
@@ -49,8 +50,8 @@ router.post(
         `INSERT INTO reservations (
           tenant_id, guest_id, room_id, category_id, status,
           arrival_date, departure_date, source, currency,
-          base_rate, total_amount, paid_amount, notes, tags
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          base_rate, total_amount, paid_amount, payment_mode, notes, tags
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
         RETURNING *`,
         [
           req.tenantId,
@@ -65,6 +66,7 @@ router.post(
           base_rate || 0,
           total_amount || 0,
           paid_amount || 0,
+          payment_mode || null,
           notes || null,
           tags || null,
         ]

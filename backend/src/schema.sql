@@ -75,6 +75,7 @@ CREATE TABLE reservations (
   taxes NUMERIC(12,2) DEFAULT 0,
   total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
   paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  payment_mode TEXT,
   notes TEXT,
   tags TEXT[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
