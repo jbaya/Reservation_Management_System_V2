@@ -1,5 +1,6 @@
-<<<<<<< HEAD
 import { useState, useEffect } from 'react';
+import { resolveRate, applyRateOverride, resetRateOverride, canUserOverrideRates } from '../utils/Rateutil';
+import RateOverrideIndicator from './RateOverrideIndicater';
 
 // ── Field helper ──────────────────────────────────────────────────────────────
 function Field({ label, children, required }) {
@@ -7,31 +8,13 @@ function Field({ label, children, required }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <label style={{ fontSize: '0.8rem', color: '#444', fontWeight: 600, marginBottom: 4, display: 'block' }}>
         {label}{required && <span style={{ color: 'red' }}> *</span>}
-=======
-import { useState } from 'react';
-
-function Field({ label, children, required }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <label
-        style={{
-          fontSize: '0.8rem',
-          color: '#444',
-          fontWeight: 600,
-          marginBottom: 4
-        }}
-      >
-        {label}
-        {required && <span style={{ color: 'red' }}> *</span>}
->>>>>>> main
       </label>
       {children}
     </div>
   );
 }
 
-<<<<<<< HEAD
-// ── Rate Override Indicator (self-contained, no import needed) ────────────────
+// ── Rate Override Indicator ───────────────────────────────────────────────────
 function RateOverrideIndicator({ isOverride, originalRate, currentRate, overriddenBy, overriddenAt }) {
   const [show, setShow] = useState(false);
   if (!isOverride) return null;
@@ -59,7 +42,7 @@ function RateOverrideIndicator({ isOverride, originalRate, currentRate, overridd
         }}>
           <div style={{ fontWeight: 700, marginBottom: 5, color: '#f39c12' }}>Rate Manually Overridden</div>
           <div>Original: <strong>₹{originalRate ?? '—'}</strong>/night</div>
-          <div>Current:  <strong>₹{currentRate}</strong>/night</div>
+          <div>Current: <strong>₹{currentRate}</strong>/night</div>
           {overriddenBy && <div style={{ color: '#aaa', marginTop: 4 }}>By: {overriddenBy}</div>}
           {overriddenAt && <div style={{ color: '#aaa' }}>At: {new Date(overriddenAt).toLocaleString('en-IN')}</div>}
           <div style={{ marginTop: 4, color: '#f87171', fontSize: '0.6rem' }}>⚠️ Only applies to this reservation</div>
@@ -69,7 +52,8 @@ function RateOverrideIndicator({ isOverride, originalRate, currentRate, overridd
   );
 }
 
-// ── resolveRate (self-contained, no import needed) ────────────────────────────
+// ── resolveRate ───────────────────────────────────────────────────────────────
+// ── resolveRate ───────────────────────────────────────────────────────────────
 function resolveRate({ travelAgentRates = [], seasons = [], agent, category, arrival }) {
   if (!agent || !category || !arrival) return { rate: 0, extraPersonRate: 0, source: 'default' };
 
@@ -81,52 +65,39 @@ function resolveRate({ travelAgentRates = [], seasons = [], agent, category, arr
   const arrDate = new Date(arrival);
   const matchedSeason = seasons.find(s => {
     const from = new Date(s.fromDate || s.startDate);
-    const to   = new Date(s.toDate   || s.endDate);
+    const to = new Date(s.toDate || s.endDate);
     return arrDate >= from && arrDate <= to;
   });
 
-  const seasonalRate  = matchedSeason ? agentRates.find(r => r.seasonId === matchedSeason.id) : null;
+  const seasonalRate = matchedSeason ? agentRates.find(r => r.seasonId === matchedSeason.id) : null;
   const offSeasonRate = agentRates.find(r => !r.seasonId || r.seasonId === 'off');
-  const resolved      = seasonalRate || offSeasonRate || agentRates[0];
+  const resolved = seasonalRate || offSeasonRate || agentRates[0];
 
   return {
-    rate:            resolved.roomRate ?? resolved.ratePerNight ?? 0,
+    rate: resolved.roomRate ?? resolved.ratePerNight ?? 0,
     extraPersonRate: resolved.extraPersonRate ?? 0,
-    source:          'agent',
-    agentName:       agent.name,
-    seasonName:      matchedSeason?.name || 'Off-Season',
+    source: 'agent',
+    agentName: agent.name,
+    seasonName: matchedSeason?.name || 'Off-Season',
   };
 }
 
 const OTA_PLATFORMS = ['Booking.com', 'MakeMyTrip', 'Agoda', 'Expedia', 'Goibibo', 'Airbnb', 'Yatra', 'Other OTA'];
 
-// ── Permission roles that can override rates ──────────────────────────────────
 const RATE_OVERRIDE_ROLES = ['Admin', 'Manager', 'Administrator'];
-=======
-const OTA_PLATFORMS = [
-  'Booking.com',
-  'MakeMyTrip',
-  'Agoda',
-  'Expedia',
-  'Goibibo',
-  'Airbnb',
-  'Yatra'
-];
->>>>>>> main
 
+// ── Main Component ────────────────────────────────────────────────────────────
 function MultiRoomReservationPage({
   rooms,
   categoryColors,
   bookings,
   onSave,
   travelAgents = [],
-<<<<<<< HEAD
   thirdParties = [],
   seasons = [],
   travelAgentRates = [],
   currentUser,
 }) {
-  // Read logged user from localStorage if currentUser not passed as prop
   const loggedUser = currentUser || (() => {
     try { return JSON.parse(localStorage.getItem('rms_loggedIn') || '{"name":"Staff","role":"Staff"}'); }
     catch { return { name: 'Staff', role: 'Staff' }; }
@@ -140,21 +111,23 @@ function MultiRoomReservationPage({
     outline: 'none', background: '#fff', color: '#1a1a2e',
   };
 
+  const newRoom = () => ({
+    id: Date.now() + Math.random(),
+    roomCategory: '', roomName: '',
+    occupancy: 1, extraPersons: 0, rate: 0, dnc: false,
+    isRateOverridden: false, originalRateDetails: null,
+    rateOverriddenBy: null, rateOverriddenAt: null,
+  });
+
   const [form, setForm] = useState({
     guestName: '', phone: '', email: '',
     arrival: '', departure: '',
     source: 'direct', otaPlatform: '', bookingId: '', agentName: '',
     tags: [],
-    rooms: [{
-      id: Date.now(),
-      roomCategory: '', roomName: '',
-      occupancy: 1, extraPersons: 0, rate: 0, dnc: false,
-      isRateOverridden: false, originalRateDetails: null,
-      rateOverriddenBy: null, rateOverriddenAt: null,
-    }],
+    rooms: [newRoom()],
   });
 
-  // ── Auto-apply agent rates when agent/dates/categories change ──────────────
+  // ── Auto-apply agent rates ─────────────────────────────────────────────────
   const roomCategoriesString = form.rooms.map(r => r.roomCategory).join(',');
 
   useEffect(() => {
@@ -177,7 +150,7 @@ function MultiRoomReservationPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.source, form.agentName, form.arrival, roomCategoriesString]);
 
-  // ── Available rooms (excludes already booked + already selected) ───────────
+  // ── Available rooms ────────────────────────────────────────────────────────
   const availableRoomsByCategory = (category, currentRoomId) => {
     const bookedRoomNames = bookings.flatMap(b => {
       if (b.arrival && b.departure && form.arrival && form.departure) {
@@ -192,153 +165,36 @@ function MultiRoomReservationPage({
   };
 
   // ── Room CRUD ──────────────────────────────────────────────────────────────
-  const addRoom = () => setForm(prev => ({
-    ...prev,
-    rooms: [...prev.rooms, {
-      id: Date.now() + Math.random(),
-      roomCategory: '', roomName: '', occupancy: 1, extraPersons: 0, rate: 0, dnc: false,
-      isRateOverridden: false, originalRateDetails: null, rateOverriddenBy: null, rateOverriddenAt: null,
-    }],
-  }));
+  const addRoom = () => setForm(prev => ({ ...prev, rooms: [...prev.rooms, newRoom()] }));
 
   const removeRoom = (id) => {
     if (form.rooms.length === 1) { alert('At least one room is required'); return; }
     if (!window.confirm('Remove this room?')) return;
     setForm(prev => ({ ...prev, rooms: prev.rooms.filter(r => r.id !== id) }));
-=======
-  thirdParties = []
-}) {
-  const inp = {
-    padding: '7px 10px',
-    borderRadius: 5,
-    border: '1px solid #ccc',
-    fontSize: '0.82rem',
-    width: '100%',
-    boxSizing: 'border-box',
-    background: '#333030'
-  };
-
-  const [form, setForm] = useState({
-    guestName: '',
-    phone: '',
-    email: '',
-    arrival: '',
-    departure: '',
-    source: 'direct',
-    otaPlatform: '',
-    bookingId: '',
-    agentName: '',
-    tags: [],
-    rooms: [
-  {
-    id: Date.now(),
-    roomCategory: '',
-    roomName: '',
-    occupancy: 1,
-    extraPersons: 0,
-    rate: 0,
-    
-  }
-]
-  });
-
-  const availableRoomsByCategory = (category, currentRoomId) => {
-  const bookedRoomNames = bookings.flatMap((b) => {
-    if (
-      b.arrival &&
-      b.departure &&
-      form.arrival &&
-      form.departure
-    ) {
-      const existingStart = new Date(b.arrival);
-      const existingEnd = new Date(b.departure);
-      const newStart = new Date(form.arrival);
-      const newEnd = new Date(form.departure);
-
-      const overlaps =
-        newStart < existingEnd && newEnd > existingStart;
-
-      if (!overlaps) return [];
-    }
-
-    if (b.isMultiRoom && b.rooms?.length) {
-      return b.rooms.map(r => r.roomName);
-    }
-
-    return [b.roomName];
-  });
-
-  const selectedInCurrentForm = form.rooms
-    .filter(r => r.id !== currentRoomId)
-    .map(r => r.roomName);
-
-  return rooms.filter(
-    r =>
-      r.category === category &&
-      !bookedRoomNames.includes(r.name) &&
-      !selectedInCurrentForm.includes(r.name)
-  );
-};
-
-  const addRoom = () => {
-    setForm(prev => ({
-      ...prev,
-      rooms: [
-        ...prev.rooms,
-       {
-  id: Date.now() + Math.random(),
-  roomCategory: '',
-  roomName: '',
-  occupancy: 1,
-  extraPersons: 0,
-  rate: 0,
-  
-}
-      ]
-    }));
-  };
-
-  const removeRoom = (id) => {
-    if (form.rooms.length === 1) {
-      alert('At least one room is required');
-      return;
-    }
-
-    if (!window.confirm('Remove this room?')) return;
-
-    setForm(prev => ({
-      ...prev,
-      rooms: prev.rooms.filter(r => r.id !== id)
-    }));
->>>>>>> main
   };
 
   const updateRoom = (id, field, value) => {
     setForm(prev => ({
       ...prev,
-<<<<<<< HEAD
       rooms: prev.rooms.map(room => {
         if (room.id !== id) return room;
         let updated = { ...room, [field]: value };
 
-        // Manual rate edit → trigger override
         if (field === 'rate' && canOverrideRates && !room.isRateOverridden) {
-          updated.isRateOverridden    = true;
-          updated.rateOverriddenBy    = loggedUser?.name || 'Staff';
-          updated.rateOverriddenAt    = new Date().toISOString();
-          // Save the original resolved rate before override
+          updated.isRateOverridden = true;
+          updated.rateOverriddenBy = loggedUser?.name || 'Staff';
+          updated.rateOverriddenAt = new Date().toISOString();
           if (!updated.originalRateDetails) {
             updated.originalRateDetails = { rate: room.rate };
           }
         }
 
-        // Category change → clear room + reset override so new auto-rate can apply
         if (field === 'roomCategory') {
-          updated.roomName            = '';
-          updated.isRateOverridden    = false;
+          updated.roomName = '';
+          updated.isRateOverridden = false;
           updated.originalRateDetails = null;
-          updated.rateOverriddenBy    = null;
-          updated.rateOverriddenAt    = null;
+          updated.rateOverriddenBy = null;
+          updated.rateOverriddenAt = null;
         }
 
         return updated;
@@ -349,12 +205,14 @@ function MultiRoomReservationPage({
   const resetRoomOverride = (id) => {
     setForm(prev => ({
       ...prev,
-      rooms: prev.rooms.map(room => {
-        if (room.id !== id) return room;
-        return { ...room, isRateOverridden: false, originalRateDetails: null, rateOverriddenBy: null, rateOverriddenAt: null };
-      }),
+      rooms: prev.rooms.map(room =>
+        room.id !== id ? room : {
+          ...room,
+          isRateOverridden: false, originalRateDetails: null,
+          rateOverriddenBy: null, rateOverriddenAt: null,
+        }
+      ),
     }));
-    // useEffect will re-apply agent rate automatically
   };
 
   // ── Totals ─────────────────────────────────────────────────────────────────
@@ -369,7 +227,6 @@ function MultiRoomReservationPage({
     if (new Set(form.rooms.map(r => r.roomName)).size !== form.rooms.length) { alert('Same room cannot be assigned twice'); return; }
     if (form.bookingId && bookings.some(b => b.bookingId?.toUpperCase() === form.bookingId.toUpperCase())) { alert('Duplicate Booking ID not allowed'); return; }
 
-    // Attach audit trail to overridden rooms
     const finalRooms = form.rooms.map(room => {
       if (room.isRateOverridden && room.originalRateDetails) {
         return {
@@ -390,96 +247,29 @@ function MultiRoomReservationPage({
     onSave({
       ...form,
       rooms: finalRooms,
-=======
-      rooms: prev.rooms.map(room =>
-        room.id === id
-          ? {
-              ...room,
-              [field]: value,
-              ...(field === 'roomCategory'
-                ? { roomName: '' }
-                : {})
-            }
-          : room
-      )
-    }));
-  };
-
-  const totalAmount = form.rooms.reduce(
-    (sum, room) => sum + parseFloat(room.rate || 0),
-    0
-  );
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    if (!form.guestName || !form.arrival || !form.departure) {
-      alert('Please fill required guest details');
-      return;
-    }
-
-    if (form.source === 'OTA' && !form.bookingId.trim()) {
-      alert('Booking ID required for OTA');
-      return;
-    }
-
-    const selectedRooms = form.rooms.map(r => r.roomName);
-
-    if (selectedRooms.includes('')) {
-      alert('Please select all room numbers');
-      return;
-    }
-
-    if (new Set(selectedRooms).size !== selectedRooms.length) {
-      alert('Same room cannot be assigned twice');
-      return;
-    }
-
-    const duplicateBookingId =
-      form.bookingId &&
-      bookings.some(
-        b =>
-          b.bookingId?.toUpperCase() ===
-          form.bookingId.toUpperCase()
-      );
-
-    if (duplicateBookingId) {
-      alert('Duplicate Booking ID not allowed');
-      return;
-    }
-
-    onSave({
-      ...form,
->>>>>>> main
       id: `b${Date.now()}`,
       isMultiRoom: true,
       totalAmount,
       status: 'confirmed',
-<<<<<<< HEAD
       timestamp: new Date().toISOString(),
-=======
-      timestamp: new Date().toISOString()
->>>>>>> main
     });
 
     alert('Multi room reservation saved');
-
     setForm({
-<<<<<<< HEAD
       guestName: '', phone: '', email: '', arrival: '', departure: '',
-      source: 'direct', otaPlatform: '', bookingId: '', agentName: '', tags: [],
-      rooms: [{ id: Date.now(), roomCategory: '', roomName: '', occupancy: 1, extraPersons: 0, rate: 0, dnc: false, isRateOverridden: false, originalRateDetails: null, rateOverriddenBy: null, rateOverriddenAt: null }],
+      source: 'direct', otaPlatform: '', bookingId: '', agentName: '',
+      tags: [], rooms: [newRoom()],
     });
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ padding: 24, fontFamily: 'inherit' }}>
       <h2 style={{ marginBottom: 20, color: '#1a1a2e' }}>🏨 Multi Room Reservation</h2>
 
       <form onSubmit={handleSubmit}>
 
-        {/* ── Guest Details ── */}
+        {/* Guest Details */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           <Field label="Guest Name" required>
             <input value={form.guestName} onChange={e => setForm(p => ({ ...p, guestName: e.target.value }))} style={inp} placeholder="Enter guest name" />
@@ -495,124 +285,10 @@ function MultiRoomReservationPage({
           </Field>
         </div>
 
-        {/* ── Booking Source ── */}
+        {/* Booking Source */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
           <Field label="Booking Source">
             <select value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))} style={inp}>
-=======
-      guestName: '',
-      phone: '',
-      email: '',
-      arrival: '',
-      departure: '',
-      source: 'direct',
-      otaPlatform: '',
-      bookingId: '',
-      agentName: '',
-      tags: [],
-      rooms: [
-        {
-          id: Date.now(),
-          roomCategory: '',
-          roomName: '',
-          occupancy: 1,
-          extraPersons: 0,
-          rate: 0
-        }
-      ]
-    });
-  };
-
-  return (
-    <div style={{ padding: 24 }}>
-      <h2 style={{ marginBottom: 20 }}>
-        🏨 Multi Room Reservation
-      </h2>
-
-      <form onSubmit={handleSubmit}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr 1fr',
-            gap: 16,
-            marginBottom: 20
-          }}
-        >
-          <Field label="Guest Name" required>
-            <input
-              value={form.guestName}
-              onChange={(e) =>
-                setForm(p => ({
-                  ...p,
-                  guestName: e.target.value
-                }))
-              }
-              style={inp}
-            />
-          </Field>
-
-          <Field label="Phone">
-            <input
-              value={form.phone}
-              onChange={(e) =>
-                setForm(p => ({
-                  ...p,
-                  phone: e.target.value
-                }))
-              }
-              style={inp}
-            />
-          </Field>
-
-          <Field label="Check-In" required>
-            <input
-              type="date"
-              value={form.arrival}
-              onChange={(e) =>
-                setForm(p => ({
-                  ...p,
-                  arrival: e.target.value
-                }))
-              }
-              style={inp}
-            />
-          </Field>
-
-          <Field label="Check-Out" required>
-            <input
-              type="date"
-              value={form.departure}
-              onChange={(e) =>
-                setForm(p => ({
-                  ...p,
-                  departure: e.target.value
-                }))
-              }
-              style={inp}
-            />
-          </Field>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr 1fr',
-            gap: 16,
-            marginBottom: 24
-          }}
-        >
-          <Field label="Booking Source">
-            <select
-              value={form.source}
-              onChange={(e) =>
-                setForm(p => ({
-                  ...p,
-                  source: e.target.value
-                }))
-              }
-              style={inp}
-            >
->>>>>>> main
               <option value="direct">Direct</option>
               <option value="OTA">OTA</option>
               <option value="agent">Travel Agent</option>
@@ -620,7 +296,6 @@ function MultiRoomReservationPage({
             </select>
           </Field>
 
-<<<<<<< HEAD
           {form.source === 'OTA' && <>
             <Field label="OTA Platform">
               <select value={form.otaPlatform} onChange={e => setForm(p => ({ ...p, otaPlatform: e.target.value }))} style={inp}>
@@ -629,7 +304,12 @@ function MultiRoomReservationPage({
               </select>
             </Field>
             <Field label="Booking ID" required>
-              <input value={form.bookingId} onChange={e => { const v = e.target.value.toUpperCase(); if (/^[A-Z0-9]*$/.test(v)) setForm(p => ({ ...p, bookingId: v })); }} placeholder="Enter Booking ID" style={inp} />
+              <input
+                value={form.bookingId}
+                onChange={e => { const v = e.target.value.toUpperCase(); if (/^[A-Z0-9]*$/.test(v)) setForm(p => ({ ...p, bookingId: v })); }}
+                placeholder="Enter Booking ID"
+                style={inp}
+              />
             </Field>
           </>}
 
@@ -646,7 +326,7 @@ function MultiRoomReservationPage({
           )}
         </div>
 
-        {/* ── Room Allocation ── */}
+        {/* Room Allocation */}
         <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 10, padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <h3 style={{ margin: 0, color: '#1a1a2e' }}>Room Allocation</h3>
@@ -669,183 +349,21 @@ function MultiRoomReservationPage({
 
               {/* Room fields */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: 14 }}>
-
                 <Field label="Room Type">
                   <select value={room.roomCategory} onChange={e => updateRoom(room.id, 'roomCategory', e.target.value)} style={inp}>
                     <option value="">Select Category</option>
                     {Object.keys(categoryColors).map(c => <option key={c}>{c}</option>)}
-=======
-          {form.source === 'OTA' && (
-            <>
-              <Field label="OTA Platform">
-                <select
-                  value={form.otaPlatform}
-                  onChange={(e) =>
-                    setForm(p => ({
-                      ...p,
-                      otaPlatform: e.target.value
-                    }))
-                  }
-                  style={inp}
-                >
-                  <option value="">Select OTA</option>
-                  {(thirdParties.length
-                    ? thirdParties.map(p => p.name)
-                    : OTA_PLATFORMS
-                  ).map(p => (
-                    <option key={p}>{p}</option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Booking ID / Reservation Reference" required>
-                <input
-                  value={form.bookingId}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase();
-                    if (/^[A-Z0-9]*$/.test(value)) {
-                      setForm(p => ({
-                        ...p,
-                        bookingId: value
-                      }));
-                    }
-                  }}
-                  placeholder="Enter Booking ID"
-                  style={inp}
-                />
-              </Field>
-            </>
-          )}
-        </div>
-
-        <div
-          style={{
-            background: '#fff',
-            border: '1px solid #ddd',
-            borderRadius: 10,
-            padding: 20
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginBottom: 20
-            }}
-          >
-            <h3>Room Allocation</h3>
-
-            <button
-              type="button"
-              onClick={addRoom}
-              style={{
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: 6,
-                background: '#1565c0',
-                color: '#fff',
-                cursor: 'pointer'
-              }}
-            >
-              + Add Room
-            </button>
-          </div>
-
-          {form.rooms.map((room, idx) => (
-            <div
-              key={room.id}
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 8,
-                padding: 16,
-                marginBottom: 16
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginBottom: 12
-                }}
-              >
-                <strong>Room {idx + 1}</strong>
-
-                <button
-                  type="button"
-                  onClick={() => removeRoom(room.id)}
-                  style={{
-                    border: 'none',
-                    background: '#ffebee',
-                    color: '#c62828',
-                    padding: '6px 12px',
-                    borderRadius: 6,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns:
-                    '1fr 1fr 1fr 1fr 1fr',
-                  gap: 14
-                }}
-              >
-                <Field label="Room Type">
-                  <select
-                    value={room.roomCategory}
-                    onChange={(e) =>
-                      updateRoom(
-                        room.id,
-                        'roomCategory',
-                        e.target.value
-                      )
-                    }
-                    style={inp}
-                  >
-                    <option value="">Select Category</option>
-                    {Object.keys(categoryColors).map(c => (
-                      <option key={c}>{c}</option>
-                    ))}
->>>>>>> main
                   </select>
                 </Field>
 
                 <Field label="Room Number">
-<<<<<<< HEAD
                   <select value={room.roomName} onChange={e => updateRoom(room.id, 'roomName', e.target.value)} style={inp}>
                     <option value="">Select Room</option>
                     {availableRoomsByCategory(room.roomCategory, room.id).map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
-=======
-                  <select
-                    value={room.roomName}
-                    onChange={(e) =>
-                      updateRoom(
-                        room.id,
-                        'roomName',
-                        e.target.value
-                      )
-                    }
-                    style={inp}
-                  >
-                    <option value="">Select Room</option>
-                    {availableRoomsByCategory(
-  room.roomCategory,
-  room.id
-).map(r => (
-                      <option key={r.name} value={r.name}>
-                        {r.name}
-                      </option>
-                    ))}
->>>>>>> main
                   </select>
                 </Field>
 
                 <Field label="Occupancy">
-<<<<<<< HEAD
                   <input type="number" min="1" value={room.occupancy} onChange={e => updateRoom(room.id, 'occupancy', e.target.value)} style={inp} />
                 </Field>
 
@@ -853,7 +371,7 @@ function MultiRoomReservationPage({
                   <input type="number" min="0" value={room.extraPersons} onChange={e => updateRoom(room.id, 'extraPersons', e.target.value)} style={inp} />
                 </Field>
 
-                {/* ── Rate field with override support ── */}
+                {/* Rate field with override support */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <label style={{ fontSize: '0.8rem', color: '#444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                     Room Rate
@@ -873,8 +391,7 @@ function MultiRoomReservationPage({
                       readOnly={!canOverrideRates}
                       title={!canOverrideRates ? 'Only Admin/Manager can edit rates' : ''}
                       style={{
-                        ...inp,
-                        flex: 1,
+                        ...inp, flex: 1,
                         border: room.isRateOverridden ? '2px solid #f39c12' : '1px solid #ccc',
                         background: !canOverrideRates ? '#f5f5f5' : '#fff',
                         cursor: !canOverrideRates ? 'not-allowed' : 'text',
@@ -887,7 +404,6 @@ function MultiRoomReservationPage({
                       </button>
                     )}
                   </div>
-                  {/* Agent rate source indicator */}
                   {!room.isRateOverridden && room.originalRateDetails?.source === 'agent' && (
                     <div style={{ fontSize: '0.6rem', color: '#1e8449', fontWeight: 700 }}>
                       ✓ Auto: {room.originalRateDetails.agentName} · {room.originalRateDetails.seasonName}
@@ -919,88 +435,11 @@ function MultiRoomReservationPage({
 
           <div style={{ textAlign: 'right', fontWeight: 800, fontSize: '1rem', color: '#1a1a2e', paddingTop: 8, borderTop: '1px solid #eee' }}>
             Total: ₹{totalAmount.toLocaleString('en-IN')}
-=======
-                  <input
-                    type="number"
-                    min="1"
-                    value={room.occupancy}
-                    onChange={(e) =>
-                      updateRoom(
-                        room.id,
-                        'occupancy',
-                        e.target.value
-                      )
-                    }
-                    style={inp}
-                  />
-                </Field>
-
-                <Field label="Extra Persons">
-                  <input
-                    type="number"
-                    min="0"
-                    value={room.extraPersons}
-                    onChange={(e) =>
-                      updateRoom(
-                        room.id,
-                        'extraPersons',
-                        e.target.value
-                      )
-                    }
-                    style={inp}
-                  />
-                </Field>
-
-                <Field label="Room Rate">
-                  <input
-                    type="number"
-                    min="0"
-                    value={room.rate}
-                    onChange={(e) =>
-                      updateRoom(
-                        room.id,
-                        'rate',
-                        e.target.value
-                      )
-                    }
-                    style={inp}
-                  />
-                </Field>
-
-                
-              </div>
-            </div>
-          ))}
-
-          <div
-            style={{
-              textAlign: 'right',
-              fontWeight: 700,
-              fontSize: '1rem'
-            }}
-          >
-            Total: ₹{totalAmount}
->>>>>>> main
           </div>
         </div>
 
         <div style={{ marginTop: 20 }}>
-<<<<<<< HEAD
           <button type="submit" style={{ padding: '10px 28px', border: 'none', borderRadius: 6, background: '#1e8449', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
-=======
-          <button
-            type="submit"
-            style={{
-              padding: '10px 28px',
-              border: 'none',
-              borderRadius: 6,
-              background: '#1e8449',
-              color: '#fff',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
->>>>>>> main
             Save Multi Room Reservation
           </button>
         </div>
