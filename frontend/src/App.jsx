@@ -6,6 +6,7 @@ import { addMonths, subMonths, format } from 'date-fns';
 import CalendarView from './components/CalendarView.jsx';
 import BookingForm from './components/BookingForm.jsx';
 import Modal from './components/Modal.jsx';
+<<<<<<< HEAD
 import DncManager from './components/DncManager';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -17,6 +18,19 @@ import { sortRoomList } from './utils/roomUtils.js';
 
 // ── Pages ─────────────────────────────────────────────────────────────────────
 
+=======
+
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+import { AUTO_COLORS, initialCategoryColors } from './constants/colors.js';
+import { sampleBookings, initialRooms, initialThirdParties } from './constants/rooms.js';
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+import { sortRoomList } from './utils/roomUtils.js';
+
+// ── Pages ─────────────────────────────────────────────────────────────────────
+
+>>>>>>> main
 import RoomCategoryPage from './pages/RoomCategoryPage.jsx';
 import RoomNoPage from './pages/RoomNoPage.jsx';
 import NewReservationPage from './pages/NewReservationPage.jsx';
@@ -28,8 +42,145 @@ import TravelAgentRateConfig from './pages/TravelAgentRateConfig.jsx';
 import SeasonConfigPage from './pages/SeasonConfigPage.jsx';
 import FloorPage from './pages/FloorPage.jsx';
 import Dashboard2 from './pages/Dashboard2.jsx';
+<<<<<<< HEAD
 
 // ══════════════════════════════════════════════════════════════════════════════
+=======
+
+// ══════════════════════════════════════════════════════════════════════════════
+function DncApprovalPopup({
+  booking,
+  onApprove,
+  onCancel
+}) {
+  const [reason, setReason] = useState('');
+
+  return (
+    <div
+      style={{
+        width: 500,
+        padding: 24,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16
+      }}
+    >
+      <h3
+        style={{
+          margin: 0,
+          color: '#c0392b'
+        }}
+      >
+        DNC Override Required
+      </h3>
+
+      <div
+        style={{
+          fontSize: '0.95rem',
+          color: '#555'
+        }}
+      >
+        This reservation is DNC locked.
+        Only admin can change this room.
+        Enter a reason before proceeding.
+      </div>
+
+      <div
+        style={{
+          border: '1px solid #f5b7b1',
+          borderRadius: 10,
+          padding: 16,
+          background: '#fff5f5'
+        }}
+      >
+        <div style={{ fontWeight: 700 }}>
+          Booking
+        </div>
+
+        <div style={{ marginTop: 8 }}>
+          {booking?.guestName}
+        </div>
+
+        <div style={{ color: '#666' }}>
+          Room {booking?.roomName}
+        </div>
+
+        <div
+          style={{
+            marginTop: 10,
+            display: 'inline-block',
+            padding: '6px 12px',
+            borderRadius: 20,
+            background: '#fdecea',
+            color: '#e74c3c',
+            fontWeight: 700,
+            fontSize: '0.8rem'
+          }}
+        >
+          DNC Locked
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontWeight: 600 }}>
+          Override reason
+        </div>
+
+        <textarea
+          value={reason}
+          onChange={(e) =>
+            setReason(e.target.value)
+          }
+          placeholder="Required for audit tracking"
+          rows={5}
+          style={{
+            width: '100%',
+            padding: 10,
+            borderRadius: 8,
+            border: '1px solid #ddd',
+            resize: 'none'
+          }}
+        />
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 10
+        }}
+      >
+        <button onClick={onCancel}>
+          Cancel
+        </button>
+
+        <button
+          onClick={() => {
+            if (!reason.trim()) {
+              alert(
+                'Override reason is required.'
+              );
+              return;
+            }
+
+            onApprove(reason);
+          }}
+          style={{
+            background: '#c0392b',
+            color: '#fff',
+            border: 'none',
+            padding: '10px 16px',
+            borderRadius: 8
+          }}
+        >
+          Confirm Override
+        </button>
+      </div>
+    </div>
+  );
+}
+
+>>>>>>> main
 // MAIN APP
 // ══════════════════════════════════════════════════════════════════════════════
 function App() {
@@ -60,6 +211,7 @@ const [isSearching, setIsSearching] = useState(false);
   const [dncOverrideOpen, setDncOverrideOpen] = useState(false);
 const [dncBooking, setDncBooking] = useState(null);
 const [dncTargetRoom, setDncTargetRoom] = useState(null);
+<<<<<<< HEAD
 
 const [floors, setFloors] = useState(() =>
   [...new Set(
@@ -81,6 +233,23 @@ const [floors, setFloors] = useState(() =>
   const loggedUser = JSON.parse(localStorage.getItem('rms_loggedIn') || '{"name":"Admin"}');
 
  useEffect(() => {
+=======
+  const [dncAfterApprove, setDncAfterApprove] = useState(null);
+
+const [floors, setFloors] = useState(() =>
+  [...new Set(
+    initialRooms.map(r => {
+      const n = parseInt(r.name);
+      if (isNaN(n) || n < 100) return 1;
+      return Math.floor(n / 100);
+    })
+  )].sort((a, b) => a - b)
+);
+
+  const loggedUser = JSON.parse(localStorage.getItem('rms_loggedIn') || '{"name":"Admin"}');
+
+  useEffect(() => {
+>>>>>>> main
     setRooms(prev => {
       const sorted = sortRoomList(prev);
       const same = sorted.every((r, i) => r.name === prev[i]?.name);
@@ -88,6 +257,7 @@ const [floors, setFloors] = useState(() =>
     });
   }, [rooms.length]);
 
+<<<<<<< HEAD
   // Keep floors in sync when rooms are added/removed
  useEffect(() => {
     const roomFloors = rooms.map(r => {
@@ -108,6 +278,8 @@ const [floors, setFloors] = useState(() =>
     });
   }, [rooms.length]);
 
+=======
+>>>>>>> main
   useEffect(() => {
   setIsSearching(true);
 
@@ -128,6 +300,10 @@ const [floors, setFloors] = useState(() =>
       return arr1 < dep2 && arr2 < dep1 && !['cancelled', 'no-show'].includes(b.status);
     });
   }
+<<<<<<< HEAD
+=======
+
+>>>>>>> main
 const normalizedBookings = bookings.flatMap((b) => {
   // NEW structured room model
   if (b.rooms?.length) {
@@ -138,9 +314,12 @@ const normalizedBookings = bookings.flatMap((b) => {
       occupancy: room.occupancy || 1,
       extraPersons: room.extraPersons || 0,
       baseRate: room.rate || b.baseRate || 0,
+<<<<<<< HEAD
       dnc:
         room.dnc ||
         false,
+=======
+>>>>>>> main
       multiRoomIndex: idx + 1
     }));
   }
@@ -148,6 +327,7 @@ const normalizedBookings = bookings.flatMap((b) => {
   // LEGACY single booking support
   return [
     {
+<<<<<<< HEAD
       ...b,
       dnc:
         b.tags?.includes('DNC') ||
@@ -188,6 +368,45 @@ const normalizedBookings = bookings.flatMap((b) => {
   return matchStatus && matchTag && matchSearch;
 });
 
+=======
+      ...b
+    }
+  ];
+});
+
+  const filteredBookings = normalizedBookings.filter((b) => {
+  const q = debouncedSearch.trim().toLowerCase();
+
+  const matchStatus =
+    filterStatus === 'all' || b.status === filterStatus;
+
+  const matchTag =
+  guestTagFilter === 'all' ||
+  (guestTagFilter === 'VIP' && b.tags?.includes('VIP'));
+
+  if (!q) {
+    return matchStatus && matchTag;
+  }
+
+  const searchableFields = [
+    b.guestName || '',
+    b.bookingId || '',
+    b.roomName || '',
+    b.source || '',
+    b.otaPlatform || '',
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  const matchSearch = searchableFields.includes(q);
+
+  if (filterStatus !== 'cancelled' && b.status === 'cancelled')
+    return false;
+
+  return matchStatus && matchTag && matchSearch;
+});
+
+>>>>>>> main
   const handleSaveBooking = (data) => {
     if (isOverlap(data, data.id)) { alert('Room overlap!'); return; }
     const now = new Date().toISOString();
@@ -203,6 +422,66 @@ const normalizedBookings = bookings.flatMap((b) => {
     if (isOverlap({ ...cur, ...updates }, id)) { alert('Overlap!'); return; }
     setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates, timestamp: new Date().toISOString() } : b));
   };
+
+ const requestDncOverride = (
+  booking,
+  targetRoom = null,
+  afterApprove = null
+) => {
+  setDncBooking(booking);
+  setDncTargetRoom(targetRoom);
+  setDncAfterApprove(() => afterApprove);
+  setDncOverrideOpen(true);
+};
+
+const handleDncApprove = (reason) => {
+  if (!reason.trim()) {
+    alert('Override reason is required');
+    return;
+  }
+
+  setBookings(prev =>
+    prev.map(b =>
+      b.id === dncBooking.id
+        ? {
+            ...b,
+            roomName:
+              dncTargetRoom?.name || b.roomName,
+            auditTrail: [
+              ...(b.auditTrail || []),
+              {
+                action: 'DNC_OVERRIDE',
+                admin: loggedUser?.name || 'Admin',
+                reason,
+                previousRoom: b.roomName,
+                newRoom:
+                  dncTargetRoom?.name || b.roomName,
+                timestamp: new Date().toISOString()
+              }
+            ]
+          }
+        : b
+    )
+  );
+
+  if (dncAfterApprove) {
+    dncAfterApprove();
+  }
+
+  setActivePage(null);
+
+  setDncOverrideOpen(false);
+  setDncBooking(null);
+  setDncTargetRoom(null);
+  setDncAfterApprove(null);
+};
+
+const handleDncCancel = () => {
+  setDncOverrideOpen(false);
+  setDncBooking(null);
+  setDncTargetRoom(null);
+  setDncAfterApprove(null);
+};
 
   const handleQuickBook = (data) => {
     if (isOverlap(data)) { alert('Overlap!'); return; }
@@ -255,7 +534,11 @@ const handleDncCancel = () => {
     case 'note':
     case 'changeroom':
   setEditingBooking(booking);
+<<<<<<< HEAD
 setActivePage('new-reservation');
+=======
+ setActivePage('new-reservation');
+>>>>>>> main
   break;
 
     case 'checkin':
@@ -310,8 +593,12 @@ setActivePage('new-reservation');
 
   const handleAddRoom = (room) => {
     if (rooms.some(r => r.name === room.name)) return;
+<<<<<<< HEAD
     const roomWithFloor = { ...room, floor: room.floor || '1' };
     setRooms(sortRoomList([...rooms, roomWithFloor]));
+=======
+    setRooms(sortRoomList([...rooms, room]));
+>>>>>>> main
   };
 
   const handleDeleteRoom = (name) => {
@@ -666,7 +953,11 @@ const checkoutsToday = validBookings.filter(
 >
   <option value="all">All Guests</option>
   <option value="VIP">VIP</option>
+<<<<<<< HEAD
   <option value="DNC">DNC</option>
+=======
+  
+>>>>>>> main
 </select>
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
                     {Object.entries(categoryColors).map(([cat, c]) => (
@@ -756,7 +1047,13 @@ const checkoutsToday = validBookings.filter(
   </div>
 ) : (
   <CalendarView
+<<<<<<< HEAD
   requestDncOverride={requestDncOverride}
+=======
+
+  requestDncOverride={requestDncOverride}
+  
+>>>>>>> main
     rooms={rooms}
     bookings={filteredBookings}
     selectedDate={selectedDate}
@@ -798,8 +1095,12 @@ const checkoutsToday = validBookings.filter(
 
               {activePage === 'room-category' && <RoomCategoryPage categoryColors={categoryColors} rooms={rooms} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} />}
               {activePage === 'room-no' && <RoomNoPage rooms={rooms} categoryColors={categoryColors} onAddRoom={handleAddRoom} onDeleteRoom={handleDeleteRoom} />}
+<<<<<<< HEAD
               {activePage === 'new-reservation' && <NewReservationPage  editingBooking={editingBooking}
   currentUser={loggedUser}
+=======
+              {activePage === 'new-reservation' && <NewReservationPage  requestDncOverride={requestDncOverride} editingBooking={editingBooking}
+>>>>>>> main
   rooms={rooms}
   categoryColors={categoryColors}
   bookings={bookings}
@@ -809,7 +1110,11 @@ const checkoutsToday = validBookings.filter(
   seasons={seasons}
   travelAgentRates={travelAgentRates}
 />}
+<<<<<<< HEAD
              {activePage === 'view-reservation' && <ViewReservationPage bookings={bookings} rooms={rooms} categoryColors={categoryColors} currentUser={loggedUser} travelAgents={travelAgents} seasons={seasons} travelAgentRates={travelAgentRates} onUpdateBooking={handleUpdateBooking} />}
+=======
+              {activePage === 'view-reservation' && <ViewReservationPage bookings={bookings} rooms={rooms} categoryColors={categoryColors} />}
+>>>>>>> main
               {activePage === 'room-tariff' && <ViewTariffPage categoryColors={categoryColors} />}
               {activePage === 'room-edit-tariff' && <EditTariffPage categoryColors={categoryColors} />}
               {activePage === 'travel-agent' && (
@@ -892,6 +1197,7 @@ const checkoutsToday = validBookings.filter(
           </div>
         </form>
       </Modal>
+<<<<<<< HEAD
       <DncManager
   open={dncOverrideOpen}
   booking={dncBooking}
@@ -899,6 +1205,20 @@ const checkoutsToday = validBookings.filter(
   onApprove={handleDncApprove}
   onCancel={handleDncCancel}
 />
+=======
+{dncOverrideOpen && (
+  <Modal
+    open={dncOverrideOpen}
+    onClose={handleDncCancel}
+  >
+   <DncApprovalPopup
+  booking={dncBooking}
+  onApprove={handleDncApprove}
+  onCancel={handleDncCancel}
+/>
+  </Modal>
+)}
+>>>>>>> main
     </div>
   );
 }

@@ -17,6 +17,10 @@ function Field({ label, children, required }) {
 const OTA_PLATFORMS = ['Booking.com', 'MakeMyTrip', 'Agoda', 'Expedia', 'Goibibo', 'Airbnb', 'Yatra', 'Other OTA'];
 
 function NewReservationPage ({
+<<<<<<< HEAD
+=======
+  requestDncOverride,
+>>>>>>> main
   editingBooking,
   rooms,
   categoryColors,
@@ -28,7 +32,19 @@ function NewReservationPage ({
   travelAgentRates = []
 }) {
   const [form, setForm] = useState(
+<<<<<<< HEAD
   editingBooking || {
+=======
+ editingBooking
+  ? {
+      ...editingBooking,
+      dnc:
+        editingBooking.dnc ||
+        editingBooking.tags?.includes('DNC') ||
+        false
+    }
+  : {
+>>>>>>> main
     guestName: '', phone: '', email: '', nationality: '',
     arrival: '', departure: '', arrivalTime: '12:00', departureTime: '10:00',
     numGuests: 1, numChildren: 0, childrenAges: [],
@@ -39,7 +55,11 @@ function NewReservationPage ({
     occupancy: 1,
     extraPersons: 0,
     rate: 0,
+<<<<<<< HEAD
     dnc: false
+=======
+    
+>>>>>>> main
   }
 ],
     mealPlan: 'EP', status: 'confirmed',
@@ -51,6 +71,10 @@ function NewReservationPage ({
     paidAmount: 0, paymentStatus: 'due',
     paymentMode: '',
     comments: [], tags: [],
+<<<<<<< HEAD
+=======
+    dnc: false,
+>>>>>>> main
   })
   const [success, setSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState('single');
@@ -59,6 +83,33 @@ const [editingCommentId, setEditingCommentId] = useState(null);
 
   const handleChange = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
 
+<<<<<<< HEAD
+=======
+  const handleDncToggle = () => {
+  setForm(prev => {
+    const newDnc = !prev.dnc;
+
+    let updatedTags = [...(prev.tags || [])];
+
+    if (newDnc) {
+      if (!updatedTags.includes('DNC')) {
+        updatedTags.push('DNC');
+      }
+    } else {
+      updatedTags = updatedTags.filter(
+        tag => tag !== 'DNC'
+      );
+    }
+
+    return {
+      ...prev,
+      dnc: newDnc,
+      tags: updatedTags
+    };
+  });
+};
+
+>>>>>>> main
   const addOrUpdateComment = () => {
   if (!newComment.trim()) {
     alert('Please enter a comment');
@@ -151,6 +202,7 @@ const deleteComment = (commentId) => {
   const discount = parseFloat(form.discount || 0);
   const netAmount = (parseFloat(totalCharges) - discount).toFixed(2);
   const duePayment = (parseFloat(netAmount) - parseFloat(form.advanceParticulars || 0)).toFixed(2);
+<<<<<<< HEAD
  const autoApplyTravelAgentRate = (agentName, roomCategory, arrivalDate) => {
     // Use current form values as fallback if params not passed
     const resolvedAgent    = agentName    || form.agentName;
@@ -183,6 +235,48 @@ const deleteComment = (commentId) => {
       extraChildCharge: matchedRate.extraPersonRate || 0,
     }));
   };
+=======
+  const autoApplyTravelAgentRate = (
+  agentName,
+  roomCategory,
+  arrivalDate
+) => {
+  if (
+    !agentName ||
+    !roomCategory ||
+    !arrivalDate
+  ) return;
+
+  const matchedSeason =
+    getSeasonForDate(arrivalDate);
+
+  if (!matchedSeason) {
+    alert('No season configured for selected date');
+    return;
+  }
+
+  const matchedRate =
+    travelAgentRates.find(rate =>
+      rate.agentName === agentName &&
+      rate.roomCategory === roomCategory &&
+      rate.seasonId === matchedSeason.id
+    );
+
+  if (!matchedRate) {
+    alert(
+      'No predefined rates found for selected travel agent'
+    );
+    return;
+  }
+
+  setForm(p => ({
+    ...p,
+    baseRate: matchedRate.roomRate,
+    extraChildCharge:
+      matchedRate.extraPersonRate
+  }));
+};
+>>>>>>> main
 
   // Determine if payment mode is mandatory based on booking source
   const isPaymentModeMandatory = form.source === 'direct' || form.source === 'agent';
@@ -204,6 +298,44 @@ const deleteComment = (commentId) => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
+<<<<<<< HEAD
+=======
+if (
+  editingBooking?.dnc &&
+  editingBooking.roomName &&
+  editingBooking.roomName !== form.rooms[0].roomName
+) {
+  requestDncOverride?.(
+    editingBooking,
+    { name: form.rooms[0].roomName },
+    () => {
+      onSave({
+        ...form,
+        roomName: form.rooms[0].roomName,
+        roomCategory: form.rooms[0].roomCategory,
+        totalAmount: netAmount,
+        balance: duePayment,
+        paymentStatus:
+          parseFloat(duePayment) <= 0
+            ? 'paid'
+            : parseFloat(
+                form.advanceParticulars || 0
+              ) > 0
+            ? 'partial'
+            : 'due',
+        id: editingBooking.id,
+        timestamp:
+          new Date().toISOString(),
+        comments: form.comments || [],
+        dnc: form.dnc
+      });
+    }
+  );
+
+  return;
+}
+
+>>>>>>> main
     // Validate advance payment type
     if (
   parseFloat(form.advanceParticulars || 0) > 0 &&
@@ -259,7 +391,12 @@ if (
 
   id: editingBooking?.id || `b${Date.now()}`,
   timestamp: new Date().toISOString(),
+<<<<<<< HEAD
   comments: form.comments || []
+=======
+  comments: form.comments || [],
+  dnc: form.dnc,
+>>>>>>> main
 });
     setSuccess(true);
 
@@ -439,6 +576,10 @@ if (
     );
   }
 }}
+<<<<<<< HEAD
+=======
+style={inp}
+>>>>>>> main
     >
       <option value="">--Select Room Category--</option>
       {Object.keys(categoryColors).map(c => (
@@ -475,6 +616,7 @@ if (
     </select>
   </Field>
 
+<<<<<<< HEAD
   <div
     style={{
       display: 'flex',
@@ -508,6 +650,9 @@ if (
       ⛔ DNC Locked
     </span>
   </div>
+=======
+  
+>>>>>>> main
 
   <div>
     <label
@@ -657,7 +802,11 @@ if (
 
           <Field label="Tags">
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 4 }}>
+<<<<<<< HEAD
               {['VIP','DNC','DND','Honeymoon','Anniversary','Birthday','Corporate'].map(tag => (
+=======
+              {['VIP','DND','Honeymoon','Anniversary','Birthday','Corporate'].map(tag => (
+>>>>>>> main
                 <button key={tag} type="button"
                   onClick={() => setForm(p => ({ ...p, tags: p.tags?.includes(tag) ? p.tags.filter(t => t !== tag) : [...(p.tags || []), tag] }))}
                   style={{ padding: '3px 10px', borderRadius: 12, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', border: form.tags?.includes(tag) ? '2px solid #1565c0' : '2px solid #ddd', background: form.tags?.includes(tag) ? '#e3f0ff' : '#f8f9fa', color: form.tags?.includes(tag) ? '#1565c0' : '#666' }}>
@@ -667,6 +816,105 @@ if (
             </div>
           </Field>
         </div>
+<<<<<<< HEAD
+=======
+        <div
+  style={{
+    marginTop: 18,
+    padding: '14px 18px',
+    borderRadius: 10,
+    border: `1px solid ${
+      form.dnc ? '#e74c3c' : '#ddd'
+    }`,
+    background: form.dnc
+      ? '#fff5f5'
+      : '#fafafa',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 14
+  }}
+>
+  <label
+    style={{
+      position: 'relative',
+      display: 'inline-block',
+      width: 52,
+      height: 28
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={form.dnc}
+      onChange={handleDncToggle}
+      style={{ display: 'none' }}
+    />
+
+    <span
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: form.dnc
+          ? '#e74c3c'
+          : '#bbb',
+        borderRadius: 20,
+        cursor: 'pointer',
+        transition: '0.2s'
+      }}
+    />
+
+    <span
+      style={{
+        position: 'absolute',
+        top: 4,
+        left: form.dnc ? 28 : 4,
+        width: 20,
+        height: 20,
+        background: '#fff',
+        borderRadius: '50%',
+        transition: '0.2s'
+      }}
+    />
+  </label>
+
+  <div>
+    <div
+      style={{
+        fontWeight: 700,
+        color: form.dnc
+          ? '#c0392b'
+          : '#444',
+        fontSize: '0.9rem'
+      }}
+    >
+      🚫 DNC — Do Not Change
+      {form.dnc && (
+        <span
+          style={{
+            marginLeft: 8,
+            background: '#e74c3c',
+            color: '#fff',
+            padding: '2px 8px',
+            borderRadius: 10,
+            fontSize: '0.7rem'
+          }}
+        >
+          ACTIVE
+        </span>
+      )}
+    </div>
+
+    <div
+      style={{
+        fontSize: '0.78rem',
+        color: '#777',
+        marginTop: 4
+      }}
+    >
+      This room is DNC locked. Admin approval required for room changes.
+    </div>
+  </div>
+</div>
+>>>>>>> main
 
         {/* Row 5: Times */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>

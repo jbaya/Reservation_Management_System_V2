@@ -27,7 +27,11 @@ export const statusColors = {
   payment_due:  { bg: '#ca6f1e', text: '#fff' },
   vip:          { bg: '#6c3483', text: '#fff' },
   dnd:          { bg: '#5d6d7e', text: '#fff' },
+<<<<<<< HEAD
   dnc: { bg: '#c0392b', text: '#fff' },
+=======
+  
+>>>>>>> main
   inquiry:      { bg: '#2e86c1', text: '#fff' },
   blocked:      { bg: '#4a4a4a', text: '#fff' },
   maintenance:  { bg: '#784212', text: '#fff' },
@@ -267,7 +271,11 @@ function BookingHoverPopup({ booking, rect }) {
           {booking.dnc && (
   <div
     style={{
+<<<<<<< HEAD
       background: '#c0392b',
+=======
+      background: '#e74c3c',
+>>>>>>> main
       color: '#fff',
       fontSize: '0.58rem',
       padding: '1px 6px',
@@ -278,6 +286,10 @@ function BookingHoverPopup({ booking, rect }) {
     DNC
   </div>
 )}
+<<<<<<< HEAD
+=======
+       
+>>>>>>> main
         </div>
       </div>
       <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
@@ -388,6 +400,7 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
           </>
         ) : (
           <>
+<<<<<<< HEAD
           {booking.dnc && (
   <div
     style={{
@@ -403,6 +416,9 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
     ⛔ DNC Guest — restricted handling
   </div>
 )}
+=======
+  
+>>>>>>> main
             <input value={form.guestName||''} onChange={e => setForm(p=>({...p,guestName:e.target.value}))} placeholder="Guest name" style={inp} autoFocus />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <input type="date" value={form.arrival||''} onChange={e => setForm(p=>({...p,arrival:e.target.value}))} style={inp} />
@@ -544,10 +560,31 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingClic
         style={{ zIndex: hovering||editing ? 5 : 2 }} disableDragging={true}>
         <div ref={barRef} style={{ position:'relative', width:'100%', height:'100%' }}
           onMouseEnter={startHover} onMouseLeave={stopHover}
-          onClick={(e)=>{e.stopPropagation();clearTimeout(hoverTimer.current);setHovering(false);setEditing(true);setAnchorRect(barRef.current?.getBoundingClientRect());}}
-          onDoubleClick={(e)=>{e.stopPropagation();if(!isBlocked(booking)){setEditing(false);onBookingDoubleClick?.(booking);}}}
+ onClick={(e) => {
+  e.stopPropagation();
+  clearTimeout(hoverTimer.current);
+  setHovering(false);
+
+  setEditing(true);
+  setAnchorRect(
+    barRef.current?.getBoundingClientRect()
+  );
+}}
+          onDoubleClick={(e) => {
+  e.stopPropagation();
+
+ setEditing(false);
+onBookingDoubleClick?.(booking);
+return;
+
+  if (!isBlocked(booking)) {
+    setEditing(false);
+    onBookingDoubleClick?.(booking);
+  }
+}}
           onContextMenu={(e)=>{e.preventDefault();e.stopPropagation();stopHover();onContextMenu?.(e,booking);}}>
           <div style={{ width:'100%', height:'100%', ...blockedStyle, ...(!isBlocked(booking)?{background:color.bg}:{}), color:color.text, borderRadius:2, display:'flex', alignItems:'center', fontWeight:isBlocked(booking)?500:600, fontSize:'0.68rem', overflow:'hidden', whiteSpace:'nowrap', cursor:'pointer', padding:'0 6px', boxShadow:hovering?'0 2px 10px rgba(0,0,0,0.25)':'0 1px 3px rgba(0,0,0,0.12)', transition:'box-shadow 0.12s', border:isBlocked(booking)?'1px solid #333':'none' }}>
+<<<<<<< HEAD
             {isBlocked(booking) ? <span style={{ opacity:0.9, fontStyle:'italic' }}>🚫 {booking.notes||'Blocked'}</span> : <>{booking.tags?.includes('VIP')&&<span style={{marginRight:3}}>⭐</span>}{booking.tags?.includes('DND')&&<span style={{marginRight:3}}>🔕</span>}{booking.guestName}</>}
             
             {booking.dnc && (
@@ -566,6 +603,14 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingClic
     ⛔ 
   </div>
 )}
+=======
+            {isBlocked(booking) ? <span style={{ opacity:0.9, fontStyle:'italic' }}>🚫 {booking.notes||'Blocked'}</span> : <>{booking.tags?.includes('VIP') && <span style={{ marginRight: 3 }}>⭐</span>}
+{booking.tags?.includes('DND') && <span style={{ marginRight: 3 }}>🔕</span>}
+{booking.dnc && <span style={{ marginRight: 3 }}>🚫</span>}
+{booking.guestName}</>}
+            
+      
+>>>>>>> main
           </div>
           
 
@@ -642,6 +687,7 @@ function handleUpdateBooking(id, updates) {
     updates.roomName &&
     updates.roomName !== cur.roomName;
 
+<<<<<<< HEAD
   if (cur.dnc && roomChanging) {
     requestDncOverride?.(
       cur,
@@ -657,6 +703,23 @@ function handleUpdateBooking(id, updates) {
     return;
   }
 
+=======
+   if (cur.dnc && roomChanging) {
+  requestDncOverride?.(
+    cur,
+    { name: updates.roomName }
+  );
+  return;
+}
+
+  
+
+  if (isOverlap({ ...cur, ...updates }, id)) {
+    window.alert('Overlap!');
+    return;
+  }
+
+>>>>>>> main
   onUpdateBooking(id, updates);
 }
 
