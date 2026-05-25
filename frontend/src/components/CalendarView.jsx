@@ -511,6 +511,7 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingClic
 // ── Main CalendarView ─────────────────────────────────────────────────────────
 function CalendarView({
   rooms,
+  allRooms,
   bookings = [],
   selectedDate,
   categoryColors = {},
@@ -735,11 +736,11 @@ function CalendarView({
       </div>
 
       <CategoryMonthlySummary
-        rooms={rooms}
-        bookings={bookings}
-        selectedDate={selectedDate}
-        categoryColors={categoryColors}
-      />
+  rooms={allRooms || rooms}
+  bookings={bookings}
+  selectedDate={selectedDate}
+  categoryColors={categoryColors}
+/>
 
       {contextMenu && (
         <ContextMenu x={contextMenu.x} y={contextMenu.y} booking={contextMenu.booking}

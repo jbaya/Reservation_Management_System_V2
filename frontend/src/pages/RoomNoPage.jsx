@@ -58,10 +58,10 @@ function RoomNoPage({ rooms, categoryColors, onAddRoom, onDeleteRoom }) {
                       <span style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 10, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600, color: '#1a1a2e' }}>{room.category}</span>
                     </td>
                     <td style={{ padding: '10px 14px', color: '#666' }}>
-                      {room.floor === 'Basement' || room.floor === '-1' ? 'Basement'
-                        : room.floor === 'Ground' || room.floor === '0' ? 'Ground Floor'
-                        : room.floor ? `Floor ${room.floor}`
-                        : '—'}
+                      {room.floor === '-1' || room.floor === -1 ? 'Basement'
+  : room.floor === '0' || room.floor === 0 ? 'Ground Floor'
+  : room.floor ? `Floor ${room.floor}`
+  : '—'}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <div style={{ width: 18, height: 18, background: c.bg, border: `2px solid ${c.border}`, borderRadius: 3 }} />
@@ -102,11 +102,11 @@ function RoomNoPage({ rooms, categoryColors, onAddRoom, onDeleteRoom }) {
           </label>
           <label style={lbl}>Floor:
             <select value={newRoom.floor} onChange={e => setNewRoom(p => ({ ...p, floor: e.target.value }))} style={inp}>
-              <option value="Basement">Basement</option>
-              <option value="0">Ground Floor</option>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].map(f => (
-                <option key={f} value={f}>Floor {f}</option>
-              ))}
+              <option value="-1">Basement</option>
+<option value="0">Ground Floor</option>
+{['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].map(f => (
+  <option key={f} value={f}>Floor {f}</option>
+))}
             </select>
           </label>
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
