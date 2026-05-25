@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { format, differenceInDays } from 'date-fns';
+import { resolveRate, calcTotals, canUserOverrideRates, shouldShowRateFields, isRateEditable, applyRateOverride, resetRateOverride, BOOKING_SOURCES } from '../utils/Rateutil';
+import RateOverrideIndicator from './RateOverrideIndicater';
 
 const OTA_PLATFORMS = [
   'Booking.com', 'MakeMyTrip', 'Agoda', 'Expedia',
@@ -103,16 +105,30 @@ function CommentItem({ comment, onDelete, onEdit, currentUser }) {
 }
 
 // ── Main BookingForm ──────────────────────────────────────────────────────────
-function BookingForm({ open, booking, rooms = [], onSaveBooking, onClose, currentUser = 'Admin' }) {
+function BookingForm({ open, booking, rooms = [], onSaveBooking, onClose, currentUser = 'Admin', travelAgents = [], travelAgentRates = [], seasons = [] }) {
   const [form,       setForm]       = useState(emptyBooking);
   const [tab,        setTab]        = useState('stay');
   const [newComment, setNewComment] = useState('');
+  const [rateInfo,   setRateInfo]   = useState(null); // stores resolved rate metadata
 
   useEffect(() => {
     setForm(booking ? { ...emptyBooking, ...booking, comments: booking.comments || [] } : emptyBooking);
     setTab('stay');
     setNewComment('');
   }, [booking, open]);
+
+ // Auto-resolve agent rate when source/agent/category/arrival changes
+  useEffect(() => {
+    if (form.source !== BOOKING_SOURCES.AGENT || !form.agentName || !form.arrival || !form.category) return;
+    if (form.isRateOverridden) return; // don't overwrite manual override
+    const agent = travelAgents.find(a => a.name === form.agentName);
+    if (!agent) return;
+    const resolved = resolveRate({ travelAgentRates, seasons, agent, category: form.category, arrival: form.arrival, source: form.source });
+    if (resolved.source === 'agent') {
+      setForm(p => ({ ...p, baseRate: resolved.rate, extraPersonCharge: resolved.extraPersonRate }));
+      setRateInfo(resolved);
+    }
+  }, [form.source, form.agentName, form.category, form.arrival]);
 
   if (!open) return null;
 
@@ -184,8 +200,11 @@ const gst = sub * (autoGst / 100);
 
   const totalCalc = calcTotal();
   const balance   = (parseFloat(totalCalc) - parseFloat(form.paidAmount || 0)).toFixed(2);
-  const isOTA     = form.source === 'OTA';
+ const isOTA                  = form.source === 'OTA';
   const isPaymentModeMandatory = form.source === 'direct' || form.source === 'agent';
+  const loggedUser             = typeof currentUser === 'object' ? currentUser : { name: currentUser, role: 'Admin' };
+  const showRates              = shouldShowRateFields(form.source);
+  const ratesEditable          = isRateEditable(form.source, loggedUser);
 
   // ── Styles ─────────────────────────────────────────────────────────────────
   const inp = {
@@ -370,6 +389,14 @@ const gst = sub * (autoGst / 100);
                 {['direct','OTA','agent','walkin','corporate'].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </label>
+           {form.source === BOOKING_SOURCES.AGENT && (
+              <label style={lbl}>Travel Agent *
+                <select value={form.agentName} onChange={e => { setForm(p => ({ ...p, agentName: e.target.value, isRateOverridden: false, originalRateDetails: null })); setRateInfo(null); }} style={{ ...inp, border: '1.5px solid #1565c0' }}>
+                  <option value="">-- Select Agent --</option>
+                  {travelAgents.map(a => <option key={a.id} value={a.name}>{a.name}{a.company ? ` (${a.company})` : ''}</option>)}
+                </select>
+              </label>
+            )}
             {isOTA && (
               <>
                 <div style={{ height: 1, background: '#dee2e6' }} />
@@ -401,7 +428,7 @@ const gst = sub * (autoGst / 100);
           <div>
             <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tags</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {['VIP','DND','Honeymoon','Anniversary','Birthday','Corporate'].map(tag => (
+              {['VIP','DNC','DND','Honeymoon','Anniversary','Birthday','Corporate'].map(tag => (
                 <button key={tag} type="button" onClick={() => toggleTag(tag)} style={{
                   padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
                   border: form.tags?.includes(tag) ? '2px solid #1565c0' : '2px solid #dee2e6',
@@ -417,12 +444,88 @@ const gst = sub * (autoGst / 100);
 
         {/* ══════════ PAYMENT TAB ══════════ */}
         {tab === 'payment' && <>
+         {/* OTA notice */}
+          {!showRates && (
+            <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 8, padding: '10px 14px', fontSize: '0.8rem', color: '#7d5a00', fontWeight: 600 }}>
+              🔒 OTA Booking — Room rates are managed externally by {form.otaPlatform || 'the OTA platform'}. No rate entry required.
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <label style={lbl}>Base Rate / Night (₹)
-              <input type="number" value={form.baseRate} onChange={update('baseRate')} placeholder="0.00" style={inp} onFocus={focusInp} onBlur={blurInp} />
+            {/* Base Rate */}
+            <label style={lbl}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                Base Rate / Night (₹)
+                {showRates && rateInfo && !form.isRateOverridden && (
+                  <RateOverrideIndicator isOverride={false} label={rateInfo.label} />
+                )}
+                {showRates && form.isRateOverridden && (
+                  <RateOverrideIndicator
+                    isOverride={true}
+                    originalRate={form.originalRateDetails?.rate}
+                    currentRate={form.baseRate}
+                    overriddenBy={form.rateOverriddenBy}
+                    overriddenAt={form.rateOverriddenAt}
+                    source={rateInfo?.label}
+                  />
+                )}
+              </div>
+              {showRates ? (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <input
+                    type="number"
+                    value={form.baseRate}
+                    onChange={e => {
+                      if (!ratesEditable) return;
+                      const newRate = e.target.value;
+                      if (form.source === BOOKING_SOURCES.AGENT && rateInfo && !form.isRateOverridden) {
+                        const updated = applyRateOverride({ ...form, roomName: form.roomName, roomCategory: form.category, rate: form.baseRate }, parseFloat(newRate), loggedUser);
+                        setForm(p => ({ ...p, baseRate: newRate, isRateOverridden: true, rateOverriddenBy: updated.rateOverriddenBy, rateOverriddenAt: updated.rateOverriddenAt, originalRateDetails: updated.originalRateDetails }));
+                      } else {
+                        setForm(p => ({ ...p, baseRate: newRate }));
+                      }
+                    }}
+                    placeholder="0.00"
+                    readOnly={!ratesEditable}
+                    title={!ratesEditable ? 'Only Admin/Manager can edit agent rates' : ''}
+                    style={{ ...inp, flex: 1, background: !ratesEditable ? '#f5f5f5' : '#fff', cursor: !ratesEditable ? 'not-allowed' : 'text', border: form.isRateOverridden ? '1.5px solid #f39c12' : '1.5px solid #ddd' }}
+                    onFocus={focusInp} onBlur={blurInp}
+                  />
+                  {form.isRateOverridden && ratesEditable && (
+                    <button type="button" title="Reset to agent rate"
+                      onClick={() => {
+                        const reset = resetRateOverride({ rate: form.baseRate, isRateOverridden: form.isRateOverridden, originalRateDetails: form.originalRateDetails }, loggedUser);
+                        setForm(p => ({ ...p, baseRate: reset.rate, isRateOverridden: false, rateOverriddenBy: null, rateOverriddenAt: null, originalRateDetails: null }));
+                        if (rateInfo) setRateInfo(rateInfo);
+                      }}
+                      style={{ padding: '4px 8px', border: '1px solid #e74c3c', borderRadius: 5, background: '#fff5f5', color: '#e74c3c', cursor: 'pointer', fontWeight: 700, fontSize: '0.7rem', flexShrink: 0 }}>
+                      ↺
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <input value="Managed by OTA" readOnly style={{ ...inp, background: '#f5f5f5', color: '#999', cursor: 'not-allowed' }} />
+              )}
+              {!ratesEditable && showRates && (
+                <div style={{ fontSize: '0.65rem', color: '#e67e22', marginTop: 2 }}>🔒 Rate editing requires Admin/Manager role</div>
+              )}
             </label>
+
+            {/* Extra Person Rate */}
             <label style={lbl}>Extra Person / Night (₹)
-              <input type="number" value={form.extraPersonCharge} onChange={update('extraPersonCharge')} placeholder="0" style={inp} onFocus={focusInp} onBlur={blurInp} />
+              {showRates ? (
+                <input
+                  type="number"
+                  value={form.extraPersonCharge}
+                  onChange={e => ratesEditable && setForm(p => ({ ...p, extraPersonCharge: e.target.value }))}
+                  placeholder="0"
+                  readOnly={!ratesEditable}
+                  style={{ ...inp, background: !ratesEditable ? '#f5f5f5' : '#fff', cursor: !ratesEditable ? 'not-allowed' : 'text' }}
+                  onFocus={focusInp} onBlur={blurInp}
+                />
+              ) : (
+                <input value="Managed by OTA" readOnly style={{ ...inp, background: '#f5f5f5', color: '#999', cursor: 'not-allowed' }} />
+              )}
             </label>
             <label style={{ ...lbl, gridColumn: '1/-1' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
