@@ -23,7 +23,9 @@ function FloorPage({
   }
 
   const getFloorLabel = (f) => {
-    return f === 0 ? 'Ground Floor' : `Floor ${f}`;
+    if (f === -1) return 'Basement';
+    if (f === 0) return 'Ground Floor';
+    return `Floor ${f}`;
   };
 
   const handleAddFloor = (e) => {
@@ -31,8 +33,8 @@ function FloorPage({
 
     const num = parseInt(newFloor.number);
 
-    if (isNaN(num) || num < 0 || num > 50) {
-      alert('Floor number must be between 0–50');
+    if (isNaN(num) || num < -1 || num > 50) {
+      alert('Floor number must be between -1 and 50');
       return;
     }
 
@@ -47,7 +49,7 @@ function FloorPage({
 
   const handleDeleteFloor = (floorNum) => {
     const roomsOnFloor = rooms.filter(
-      r => (r.floor ?? getFloor(r.name)) === floorNum
+      r => String(r.floor ?? getFloor(r.name)) === String(floorNum)
     );
 
     if (roomsOnFloor.length > 0) {
@@ -86,23 +88,10 @@ function FloorPage({
           }}
         >
           <div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: '1.2rem',
-                color: '#1f2937',
-              }}
-            >
+            <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#1f2937' }}>
               🏢 Floor Management
             </h2>
-
-            <p
-              style={{
-                margin: '6px 0 0',
-                fontSize: '0.82rem',
-                color: '#777',
-              }}
-            >
+            <p style={{ margin: '6px 0 0', fontSize: '0.82rem', color: '#777' }}>
               Add, manage and filter hotel floors
             </p>
           </div>
@@ -148,11 +137,7 @@ function FloorPage({
 
             <select
               value={newFloor.number}
-              onChange={(e) =>
-                setNewFloor({
-                  number: parseInt(e.target.value),
-                })
-              }
+              onChange={(e) => setNewFloor({ number: parseInt(e.target.value) })}
               style={{
                 padding: '10px 12px',
                 borderRadius: 8,
@@ -160,17 +145,15 @@ function FloorPage({
                 minWidth: 220,
               }}
             >
-              <option value={0}>Ground Floor (0)</option>
-
+              <option value={-1} disabled={floors.includes(-1)}>
+                {floors.includes(-1) ? 'Basement (exists)' : 'Basement'}
+              </option>
+              <option value={0} disabled={floors.includes(0)}>
+                {floors.includes(0) ? 'Ground Floor (exists)' : 'Ground Floor'}
+              </option>
               {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
-                <option
-                  key={n}
-                  value={n}
-                  disabled={floors.includes(n)}
-                >
-                  {floors.includes(n)
-                    ? `Floor ${n} (exists)`
-                    : `Floor ${n}`}
+                <option key={n} value={n} disabled={floors.includes(n)}>
+                  {floors.includes(n) ? `Floor ${n} (exists)` : `Floor ${n}`}
                 </option>
               ))}
             </select>
@@ -192,15 +175,10 @@ function FloorPage({
           </button>
         </form>
 
-        <div
-          style={{
-            display: 'grid',
-            gap: 14,
-          }}
-        >
+        <div style={{ display: 'grid', gap: 14 }}>
           {floors.map((f) => {
             const roomsOnFloor = rooms.filter(
-              r => (r.floor ?? getFloor(r.name)) === f
+              r => String(r.floor ?? getFloor(r.name)) === String(f)
             );
 
             const isExpanded = floorFilter === String(f);
@@ -216,59 +194,33 @@ function FloorPage({
                 }}
               >
                 <div
-                  onClick={() =>
-                    setFloorFilter(
-                      isExpanded ? 'all' : String(f)
-                    )
-                  }
+                  onClick={() => setFloorFilter(isExpanded ? 'all' : String(f))}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '14px 18px',
                     cursor: 'pointer',
-                    background: isExpanded
-                      ? '#e8f4ff'
-                      : '#f8fafc',
+                    background: isExpanded ? '#e8f4ff' : '#f8fafc',
                   }}
                 >
                   <div>
                     <div
                       style={{
                         fontWeight: 700,
-                        color: isExpanded
-                          ? '#1565c0'
-                          : '#1f2937',
+                        color: isExpanded ? '#1565c0' : '#1f2937',
                         fontSize: '0.9rem',
                       }}
                     >
                       🏢 {getFloorLabel(f)}
                     </div>
-
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        color: '#888',
-                        marginTop: 4,
-                      }}
-                    >
+                    <div style={{ fontSize: '0.75rem', color: '#888', marginTop: 4 }}>
                       {roomsOnFloor.length} room(s) • click to filter calendar
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 10,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: '#1565c0',
-                        fontWeight: 700,
-                      }}
-                    >
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <span style={{ color: '#1565c0', fontWeight: 700 }}>
                       {isExpanded ? '▲' : '▼'}
                     </span>
 
@@ -283,18 +235,9 @@ function FloorPage({
                         padding: '6px 14px',
                         borderRadius: 8,
                         border: 'none',
-                        cursor:
-                          roomsOnFloor.length > 0
-                            ? 'not-allowed'
-                            : 'pointer',
-                        background:
-                          roomsOnFloor.length > 0
-                            ? '#f0f0f0'
-                            : '#ffebee',
-                        color:
-                          roomsOnFloor.length > 0
-                            ? '#999'
-                            : '#c62828',
+                        cursor: roomsOnFloor.length > 0 ? 'not-allowed' : 'pointer',
+                        background: roomsOnFloor.length > 0 ? '#f0f0f0' : '#ffebee',
+                        color: roomsOnFloor.length > 0 ? '#999' : '#c62828',
                         fontWeight: 600,
                       }}
                     >
@@ -313,17 +256,15 @@ function FloorPage({
                     }}
                   >
                     {roomsOnFloor.map((room) => {
-                      const catColor =
-                        categoryColors[room.category] || {
-                          bg: '#f5f5f5',
-                          border: '#999',
-                        };
+                      const catColor = categoryColors[room.category] || {
+                        bg: '#f5f5f5',
+                        border: '#999',
+                      };
 
                       const statusColor =
                         room.roomOperationalStatus === 'ACTIVE'
                           ? '#1e8449'
-                          : room.roomOperationalStatus ===
-                            'UNDER_RENOVATION'
+                          : room.roomOperationalStatus === 'UNDER_RENOVATION'
                           ? '#e67e22'
                           : '#c0392b';
 
@@ -341,22 +282,10 @@ function FloorPage({
                           }}
                         >
                           <div>
-                            <div
-                              style={{
-                                fontWeight: 700,
-                                color: '#1f2937',
-                              }}
-                            >
+                            <div style={{ fontWeight: 700, color: '#1f2937' }}>
                               Room {room.name}
                             </div>
-
-                            <div
-                              style={{
-                                fontSize: '0.75rem',
-                                color: '#666',
-                                marginTop: 4,
-                              }}
-                            >
+                            <div style={{ fontSize: '0.75rem', color: '#666', marginTop: 4 }}>
                               {room.category}
                             </div>
                           </div>
@@ -371,11 +300,7 @@ function FloorPage({
                               color: statusColor,
                             }}
                           >
-                            {
-                              ROOM_STATUS_LABELS[
-                                room.roomOperationalStatus
-                              ]
-                            }
+                            {ROOM_STATUS_LABELS[room.roomOperationalStatus]}
                           </div>
                         </div>
                       );
