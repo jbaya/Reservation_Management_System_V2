@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { resolveRate, applyRateOverride, resetRateOverride, canUserOverrideRates } from '../utils/Rateutil';
-import RateOverrideIndicator from './RateOverrideIndicater';
+
+const OTA_PLATFORMS = ['Booking.com', 'MakeMyTrip', 'Agoda', 'Expedia', 'Goibibo', 'Airbnb', 'Yatra', 'Other OTA'];
+const RATE_OVERRIDE_ROLES = ['Admin', 'Manager', 'Administrator'];
 
 // ── Field helper ──────────────────────────────────────────────────────────────
 function Field({ label, children, required }) {
@@ -53,7 +54,6 @@ function RateOverrideIndicator({ isOverride, originalRate, currentRate, overridd
 }
 
 // ── resolveRate ───────────────────────────────────────────────────────────────
-// ── resolveRate ───────────────────────────────────────────────────────────────
 function resolveRate({ travelAgentRates = [], seasons = [], agent, category, arrival }) {
   if (!agent || !category || !arrival) return { rate: 0, extraPersonRate: 0, source: 'default' };
 
@@ -81,10 +81,6 @@ function resolveRate({ travelAgentRates = [], seasons = [], agent, category, arr
     seasonName: matchedSeason?.name || 'Off-Season',
   };
 }
-
-const OTA_PLATFORMS = ['Booking.com', 'MakeMyTrip', 'Agoda', 'Expedia', 'Goibibo', 'Airbnb', 'Yatra', 'Other OTA'];
-
-const RATE_OVERRIDE_ROLES = ['Admin', 'Manager', 'Administrator'];
 
 // ── Main Component ────────────────────────────────────────────────────────────
 function MultiRoomReservationPage({
@@ -127,7 +123,6 @@ function MultiRoomReservationPage({
     rooms: [newRoom()],
   });
 
-  // ── Auto-apply agent rates ─────────────────────────────────────────────────
   const roomCategoriesString = form.rooms.map(r => r.roomCategory).join(',');
 
   useEffect(() => {
@@ -150,7 +145,6 @@ function MultiRoomReservationPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.source, form.agentName, form.arrival, roomCategoriesString]);
 
-  // ── Available rooms ────────────────────────────────────────────────────────
   const availableRoomsByCategory = (category, currentRoomId) => {
     const bookedRoomNames = bookings.flatMap(b => {
       if (b.arrival && b.departure && form.arrival && form.departure) {
@@ -164,7 +158,6 @@ function MultiRoomReservationPage({
     return rooms.filter(r => r.category === category && !bookedRoomNames.includes(r.name) && !selectedInForm.includes(r.name));
   };
 
-  // ── Room CRUD ──────────────────────────────────────────────────────────────
   const addRoom = () => setForm(prev => ({ ...prev, rooms: [...prev.rooms, newRoom()] }));
 
   const removeRoom = (id) => {
@@ -215,10 +208,8 @@ function MultiRoomReservationPage({
     }));
   };
 
-  // ── Totals ─────────────────────────────────────────────────────────────────
   const totalAmount = form.rooms.reduce((sum, r) => sum + parseFloat(r.rate || 0), 0);
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.guestName || !form.arrival || !form.departure) { alert('Please fill required guest details'); return; }
@@ -262,14 +253,12 @@ function MultiRoomReservationPage({
     });
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ padding: 24, fontFamily: 'inherit' }}>
       <h2 style={{ marginBottom: 20, color: '#1a1a2e' }}>🏨 Multi Room Reservation</h2>
 
       <form onSubmit={handleSubmit}>
 
-        {/* Guest Details */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           <Field label="Guest Name" required>
             <input value={form.guestName} onChange={e => setForm(p => ({ ...p, guestName: e.target.value }))} style={inp} placeholder="Enter guest name" />
@@ -285,7 +274,6 @@ function MultiRoomReservationPage({
           </Field>
         </div>
 
-        {/* Booking Source */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
           <Field label="Booking Source">
             <select value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))} style={inp}>
@@ -326,7 +314,6 @@ function MultiRoomReservationPage({
           )}
         </div>
 
-        {/* Room Allocation */}
         <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 10, padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <h3 style={{ margin: 0, color: '#1a1a2e' }}>Room Allocation</h3>
@@ -336,7 +323,6 @@ function MultiRoomReservationPage({
           {form.rooms.map((room, idx) => (
             <div key={room.id} style={{ border: `1px solid ${room.isRateOverridden ? '#f39c12' : '#e5e7eb'}`, borderRadius: 8, padding: 16, marginBottom: 16, background: room.isRateOverridden ? '#fffbea' : '#fff' }}>
 
-              {/* Room header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <strong style={{ color: '#1a1a2e' }}>Room {idx + 1}</strong>
@@ -347,7 +333,6 @@ function MultiRoomReservationPage({
                 <button type="button" onClick={() => removeRoom(room.id)} style={{ border: 'none', background: '#ffebee', color: '#c62828', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>Remove</button>
               </div>
 
-              {/* Room fields */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: 14 }}>
                 <Field label="Room Type">
                   <select value={room.roomCategory} onChange={e => updateRoom(room.id, 'roomCategory', e.target.value)} style={inp}>
@@ -371,7 +356,6 @@ function MultiRoomReservationPage({
                   <input type="number" min="0" value={room.extraPersons} onChange={e => updateRoom(room.id, 'extraPersons', e.target.value)} style={inp} />
                 </Field>
 
-                {/* Rate field with override support */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <label style={{ fontSize: '0.8rem', color: '#444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                     Room Rate
@@ -419,7 +403,6 @@ function MultiRoomReservationPage({
                 </Field>
               </div>
 
-              {/* Rate override audit row */}
               {room.isRateOverridden && (
                 <div style={{ marginTop: 10, background: '#fffbea', border: '1px solid #ffe082', borderRadius: 5, padding: '6px 10px', fontSize: '0.7rem', color: '#7d5a00', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                   <span>

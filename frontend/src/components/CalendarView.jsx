@@ -27,19 +27,15 @@ export const statusColors = {
   payment_due:  { bg: '#ca6f1e', text: '#fff' },
   vip:          { bg: '#6c3483', text: '#fff' },
   dnd:          { bg: '#5d6d7e', text: '#fff' },
-<<<<<<< HEAD
-  dnc: { bg: '#c0392b', text: '#fff' },
-=======
-  
->>>>>>> main
+  dnc:          { bg: '#c0392b', text: '#fff' },
   inquiry:      { bg: '#2e86c1', text: '#fff' },
   blocked:      { bg: '#4a4a4a', text: '#fff' },
   maintenance:  { bg: '#784212', text: '#fff' },
 };
 
 const ROOM_COL_WIDTH = 80;
-const CURRENT_USER = 'Staff'; // change to your auth user name
-const IS_ADMIN = CURRENT_USER === 'Admin'; // Replace with real admin check
+const CURRENT_USER = 'Staff';
+const IS_ADMIN = CURRENT_USER === 'Admin';
 
 const isBlocked = (b) => b.status === 'blocked' || b.status === 'maintenance';
 
@@ -66,7 +62,7 @@ function formatCommentTime(iso) {
   return `${hh}:${mm} ${day} ${mon}`;
 }
 
-// ── Inline Comment Thread (used inside QuickEdit & NewBooking) ────────────────
+// ── Inline Comment Thread ─────────────────────────────────────────────────────
 function InlineCommentThread({ comments = [], onChange }) {
   const [draft, setDraft] = useState('');
   const taRef = useRef(null);
@@ -97,26 +93,11 @@ function InlineCommentThread({ comments = [], onChange }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {/* Thread */}
       {comments.length > 0 && (
-        <div style={{
-          maxHeight: 160, overflowY: 'auto',
-          border: '1px solid #e8eaed', borderRadius: 6,
-          background: '#fafafa',
-        }}>
+        <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #e8eaed', borderRadius: 6, background: '#fafafa' }}>
           {comments.map((c, i) => (
-            <div key={c.id} style={{
-              padding: '6px 10px',
-              borderBottom: i < comments.length - 1 ? '1px solid #f0f0f0' : 'none',
-              display: 'flex', gap: 7, alignItems: 'flex-start',
-            }}>
-              {/* Avatar */}
-              <div style={{
-                width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                background: '#1565c0', color: '#fff',
-                fontSize: '0.6rem', fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
+            <div key={c.id} style={{ padding: '6px 10px', borderBottom: i < comments.length - 1 ? '1px solid #f0f0f0' : 'none', display: 'flex', gap: 7, alignItems: 'flex-start' }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, background: '#1565c0', color: '#fff', fontSize: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {c.author?.[0]?.toUpperCase() || 'S'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -124,47 +105,27 @@ function InlineCommentThread({ comments = [], onChange }) {
                   <span style={{ fontWeight: 700, fontSize: '0.7rem', color: '#1a1a2e' }}>{c.author}</span>
                   <span style={{ fontSize: '0.62rem', color: '#bbb' }}>{formatCommentTime(c.createdAt)}</span>
                 </div>
-                <p style={{ margin: 0, fontSize: '0.73rem', color: '#333', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {c.text}
-                </p>
+                <p style={{ margin: 0, fontSize: '0.73rem', color: '#333', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.text}</p>
               </div>
-              {/* Delete — only own */}
               {c.author === CURRENT_USER && (
-                <button
-                  onClick={() => deleteComment(c.id)}
-                  title="Delete"
+                <button onClick={() => deleteComment(c.id)} title="Delete"
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '0.75rem', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
                   onMouseEnter={e => e.currentTarget.style.color='#e74c3c'}
-                  onMouseLeave={e => e.currentTarget.style.color='#ccc'}
-                >✕</button>
+                  onMouseLeave={e => e.currentTarget.style.color='#ccc'}>✕</button>
               )}
             </div>
           ))}
         </div>
       )}
-
-      {/* Input row */}
       <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end' }}>
-        <textarea
-          ref={taRef}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
+        <textarea ref={taRef} value={draft} onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(); }}}
           placeholder={comments.length ? 'Add another comment…' : 'Add a comment…'}
-          rows={2}
-          style={{ ...inp, flex: 1 }}
-        />
-        <button
-          onClick={addComment}
-          disabled={!draft.trim()}
-          style={{
-            padding: '5px 10px', border: 'none', borderRadius: 5,
-            background: draft.trim() ? '#1565c0' : '#b0c4de',
-            color: '#fff', fontSize: '0.7rem', fontWeight: 700,
-            cursor: draft.trim() ? 'pointer' : 'default',
-            flexShrink: 0, height: 52,
-          }}
-        >Post</button>
+          rows={2} style={{ ...inp, flex: 1 }} />
+        <button onClick={addComment} disabled={!draft.trim()}
+          style={{ padding: '5px 10px', border: 'none', borderRadius: 5, background: draft.trim() ? '#1565c0' : '#b0c4de', color: '#fff', fontSize: '0.7rem', fontWeight: 700, cursor: draft.trim() ? 'pointer' : 'default', flexShrink: 0, height: 52 }}>
+          Post
+        </button>
       </div>
       {comments.length > 0 && (
         <div style={{ fontSize: '0.6rem', color: '#bbb', textAlign: 'right' }}>
@@ -236,7 +197,6 @@ function BookingHoverPopup({ booking, rect }) {
   if (!rect) return null;
 
   const comments = booking.comments || [];
-  // dynamic height: base + comments
   const popW = 260;
   const baseH = 230;
   const commentsH = comments.length > 0 ? Math.min(comments.length * 52 + 48, 180) : 0;
@@ -269,27 +229,8 @@ function BookingHoverPopup({ booking, rect }) {
           {booking.tags?.includes('VIP') && <div style={{ background: '#6c3483', color: '#fff', fontSize: '0.58rem', padding: '1px 6px', borderRadius: 6, fontWeight: 700 }}>VIP</div>}
           {booking.tags?.includes('DND') && <div style={{ background: '#5d6d7e', color: '#fff', fontSize: '0.58rem', padding: '1px 6px', borderRadius: 6, fontWeight: 700 }}>DND</div>}
           {booking.dnc && (
-  <div
-    style={{
-<<<<<<< HEAD
-      background: '#c0392b',
-=======
-      background: '#e74c3c',
->>>>>>> main
-      color: '#fff',
-      fontSize: '0.58rem',
-      padding: '1px 6px',
-      borderRadius: 6,
-      fontWeight: 700
-    }}
-  >
-    DNC
-  </div>
-)}
-<<<<<<< HEAD
-=======
-       
->>>>>>> main
+            <div style={{ background: '#c0392b', color: '#fff', fontSize: '0.58rem', padding: '1px 6px', borderRadius: 6, fontWeight: 700 }}>DNC</div>
+          )}
         </div>
       </div>
       <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
@@ -302,43 +243,23 @@ function BookingHoverPopup({ booking, rect }) {
       </div>
       <div style={{ padding: '7px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 10px' }}>
         {[
-  ['Guests', booking.numGuests || 1],
-  ['Nationality', booking.nationality || '—'],
-  ['Meal', booking.mealPlan || '—'],
-  ['Source', booking.source || '—'],
-
-  ...(booking.otaPlatform
-    ? [['Platform', booking.otaPlatform]]
-    : []),
-
-  ...(booking.bookingId
-    ? [['Booking ID', booking.bookingId]]
-    : []),
-
-  ...(booking.advanceParticulars
-    ? [['Advance Paid', `₹${booking.advanceParticulars}`]]
-    : []),
-
-  ...(booking.totalAmount
-    ? [['Total', `₹${booking.totalAmount}`]]
-    : []),
-
-  ...(booking.balance
-    ? [['Balance Due', `₹${booking.balance}`]]
-    : []),
-].map(([label, val]) => (
+          ['Guests', booking.numGuests || 1],
+          ['Nationality', booking.nationality || '—'],
+          ['Meal', booking.mealPlan || '—'],
+          ['Source', booking.source || '—'],
+          ...(booking.otaPlatform ? [['Platform', booking.otaPlatform]] : []),
+          ...(booking.bookingId ? [['Booking ID', booking.bookingId]] : []),
+          ...(booking.advanceParticulars ? [['Advance Paid', `₹${booking.advanceParticulars}`]] : []),
+          ...(booking.totalAmount ? [['Total', `₹${booking.totalAmount}`]] : []),
+          ...(booking.balance ? [['Balance Due', `₹${booking.balance}`]] : []),
+        ].map(([label, val]) => (
           <div key={label}>
             <span style={{ color: '#605959', fontSize: '0.62rem' }}>{label}: </span>
-            <span style={{ fontWeight: 600,color:
-  label === 'Payment' ||
-  label === 'Balance Due'
-    ? pc
-    : '#1a1a2e',fontSize: '0.76rem', textTransform: 'capitalize' }}>{val}</span>
+            <span style={{ fontWeight: 600, color: label === 'Payment' || label === 'Balance Due' ? pc : '#1a1a2e', fontSize: '0.76rem', textTransform: 'capitalize' }}>{val}</span>
           </div>
         ))}
       </div>
 
-      {/* ── Comments thread in hover popup ── */}
       {comments.length > 0 && (
         <div style={{ margin: '0 10px 8px', background: '#fffde7', border: '1px solid #ffe082', borderRadius: 6, overflow: 'hidden' }}>
           {comments.map((c, i) => (
@@ -368,7 +289,6 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
   if (!rect) return null;
 
   const popW = 290;
-  // Dynamic height based on comment count
   const commentRows = (form.comments || []).length;
   const popH = 320 + Math.min(commentRows * 52, 160);
 
@@ -400,25 +320,11 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
           </>
         ) : (
           <>
-<<<<<<< HEAD
-          {booking.dnc && (
-  <div
-    style={{
-      background: '#fdecea',
-      border: '1px solid #f5b7b1',
-      color: '#c0392b',
-      padding: '8px 10px',
-      borderRadius: 6,
-      fontSize: '0.72rem',
-      fontWeight: 700
-    }}
-  >
-    ⛔ DNC Guest — restricted handling
-  </div>
-)}
-=======
-  
->>>>>>> main
+            {booking.dnc && (
+              <div style={{ background: '#fdecea', border: '1px solid #f5b7b1', color: '#c0392b', padding: '8px 10px', borderRadius: 6, fontSize: '0.72rem', fontWeight: 700 }}>
+                ⛔ DNC Guest — restricted handling
+              </div>
+            )}
             <input value={form.guestName||''} onChange={e => setForm(p=>({...p,guestName:e.target.value}))} placeholder="Guest name" style={inp} autoFocus />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <input type="date" value={form.arrival||''} onChange={e => setForm(p=>({...p,arrival:e.target.value}))} style={inp} />
@@ -433,7 +339,6 @@ function QuickEditPopup({ booking, rect, onSave, onClose, onFullEdit }) {
               </select>
             </div>
 
-            {/* ── Comment Thread ── */}
             <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8, marginTop: 2 }}>
               <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
                 💬 Comments
@@ -469,7 +374,7 @@ function NewBookingPopup({ room, day, rect, onBook, onClose }) {
     departure:format(addDays(day,1),'yyyy-MM-dd'),
     mealPlan:'EP', status:'confirmed', paymentStatus:'paid',
     source:'direct', numGuests:1,
-    comments: [],  // ← threaded comments instead of notes
+    comments: [],
   });
 
   if (!rect) return null;
@@ -508,7 +413,6 @@ function NewBookingPopup({ room, day, rect, onBook, onClose }) {
           <select value={form.source} onChange={e=>setForm(p=>({...p,source:e.target.value}))} style={inp}>{['direct','OTA','agent','walkin'].map(s=><option key={s} value={s}>{s}</option>)}</select>
         </div>
 
-        {/* ── Inline comment thread ── */}
         <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 7, marginTop: 1 }}>
           <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#888', marginBottom: 5 }}>💬 Comments (optional)</div>
           <InlineCommentThread
@@ -541,10 +445,10 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingClic
   const [editing,  setEditing]  = useState(false);
   const [anchorRect, setAnchorRect] = useState(null);
   const barRef = useRef(null), hoverTimer = useRef(null);
-  const dep   = new Date(booking.departure);
+  const dep = new Date(booking.departure);
   const color = isBlocked(booking)
-  ? statusColors.blocked
-  : paymentTagColors[booking.paymentStatus] || paymentTagColors.due;
+    ? statusColors.blocked
+    : paymentTagColors[booking.paymentStatus] || paymentTagColors.due;
   const payTag = !isBlocked(booking) ? paymentTagColors[booking.paymentStatus] : null;
 
   const startHover = () => { hoverTimer.current = setTimeout(() => { if(!editing){setAnchorRect(barRef.current?.getBoundingClientRect());setHovering(true);} }, 220); };
@@ -560,74 +464,46 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingClic
         style={{ zIndex: hovering||editing ? 5 : 2 }} disableDragging={true}>
         <div ref={barRef} style={{ position:'relative', width:'100%', height:'100%' }}
           onMouseEnter={startHover} onMouseLeave={stopHover}
- onClick={(e) => {
-  e.stopPropagation();
-  clearTimeout(hoverTimer.current);
-  setHovering(false);
-
-  setEditing(true);
-  setAnchorRect(
-    barRef.current?.getBoundingClientRect()
-  );
-}}
+          onClick={(e) => {
+            e.stopPropagation();
+            clearTimeout(hoverTimer.current);
+            setHovering(false);
+            setEditing(true);
+            setAnchorRect(barRef.current?.getBoundingClientRect());
+          }}
           onDoubleClick={(e) => {
-  e.stopPropagation();
-
- setEditing(false);
-onBookingDoubleClick?.(booking);
-return;
-
-  if (!isBlocked(booking)) {
-    setEditing(false);
-    onBookingDoubleClick?.(booking);
-  }
-}}
+            e.stopPropagation();
+            setEditing(false);
+            onBookingDoubleClick?.(booking);
+          }}
           onContextMenu={(e)=>{e.preventDefault();e.stopPropagation();stopHover();onContextMenu?.(e,booking);}}>
           <div style={{ width:'100%', height:'100%', ...blockedStyle, ...(!isBlocked(booking)?{background:color.bg}:{}), color:color.text, borderRadius:2, display:'flex', alignItems:'center', fontWeight:isBlocked(booking)?500:600, fontSize:'0.68rem', overflow:'hidden', whiteSpace:'nowrap', cursor:'pointer', padding:'0 6px', boxShadow:hovering?'0 2px 10px rgba(0,0,0,0.25)':'0 1px 3px rgba(0,0,0,0.12)', transition:'box-shadow 0.12s', border:isBlocked(booking)?'1px solid #333':'none' }}>
-<<<<<<< HEAD
-            {isBlocked(booking) ? <span style={{ opacity:0.9, fontStyle:'italic' }}>🚫 {booking.notes||'Blocked'}</span> : <>{booking.tags?.includes('VIP')&&<span style={{marginRight:3}}>⭐</span>}{booking.tags?.includes('DND')&&<span style={{marginRight:3}}>🔕</span>}{booking.guestName}</>}
-            
-            {booking.dnc && (
-  <div
-    style={{
-      fontSize: '0.65rem',
-      fontWeight: 700,
-      color: '#fff',
-      background: '#c0392b',
-      padding: '12px 12px',
-      borderRadius: 4,
-      marginTop: 4,
-    
-    }}
-  >
-    ⛔ 
-  </div>
-)}
-=======
-            {isBlocked(booking) ? <span style={{ opacity:0.9, fontStyle:'italic' }}>🚫 {booking.notes||'Blocked'}</span> : <>{booking.tags?.includes('VIP') && <span style={{ marginRight: 3 }}>⭐</span>}
-{booking.tags?.includes('DND') && <span style={{ marginRight: 3 }}>🔕</span>}
-{booking.dnc && <span style={{ marginRight: 3 }}>🚫</span>}
-{booking.guestName}</>}
-            
-      
->>>>>>> main
+            {isBlocked(booking)
+              ? <span style={{ opacity:0.9, fontStyle:'italic' }}>🚫 {booking.notes||'Blocked'}</span>
+              : <>
+                  {booking.tags?.includes('VIP') && <span style={{ marginRight: 3 }}>⭐</span>}
+                  {booking.tags?.includes('DND') && <span style={{ marginRight: 3 }}>🔕</span>}
+                  {booking.dnc && <span style={{ marginRight: 3 }}>🚫</span>}
+                  {booking.guestName}
+                </>
+            }
           </div>
-          
-
         </div>
       </Rnd>
       {hovering && !editing && (isBlocked(booking) ? <BlockedHoverPopup booking={booking} rect={anchorRect} /> : <BookingHoverPopup booking={booking} rect={anchorRect} />)}
-     {editing && <QuickEditPopup
-  booking={booking}
-  rect={anchorRect}
-  onSave={(u)=>onUpdateBooking(booking.id,{...u,updatedAt:new Date().toISOString()})}
-  onClose={()=>{setEditing(false);setHovering(false);}}
-  onFullEdit={(booking) => {
-    setEditing(false);
-    setHovering(false);
-    onBookingDoubleClick?.(booking);
-  }}
-/>}
+      {editing && (
+        <QuickEditPopup
+          booking={booking}
+          rect={anchorRect}
+          onSave={(u) => onUpdateBooking(booking.id, {...u, updatedAt: new Date().toISOString()})}
+          onClose={() => { setEditing(false); setHovering(false); }}
+          onFullEdit={(booking) => {
+            setEditing(false);
+            setHovering(false);
+            onBookingDoubleClick?.(booking);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -650,7 +526,6 @@ function CalendarView({
   const [containerWidth, setContainerWidth] = useState(window.innerWidth);
   const [cellPopup,   setCellPopup]   = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
-  
 
   useEffect(() => {
     const obs = new ResizeObserver(entries => { for(const e of entries) setContainerWidth(e.contentRect.width); });
@@ -679,75 +554,51 @@ function CalendarView({
       return arr1<dep2 && arr2<dep1 && !['cancelled','no-show'].includes(b.status);
     });
   }
-function handleUpdateBooking(id, updates) {
-  const cur = bookings.find(b => b.id === id);
-  if (!cur) return;
 
-  const roomChanging =
-    updates.roomName &&
-    updates.roomName !== cur.roomName;
+  function handleUpdateBooking(id, updates) {
+    const cur = bookings.find(b => b.id === id);
+    if (!cur) return;
 
-<<<<<<< HEAD
-  if (cur.dnc && roomChanging) {
-    requestDncOverride?.(
-      cur,
-      {
-        name: updates.roomName
-      }
-    );
-    return;
+    const roomChanging = updates.roomName && updates.roomName !== cur.roomName;
+
+    if (cur.dnc && roomChanging) {
+      requestDncOverride?.(cur, { name: updates.roomName });
+      return;
+    }
+
+    if (isOverlap({ ...cur, ...updates }, id)) {
+      window.alert('Overlap!');
+      return;
+    }
+
+    onUpdateBooking(id, updates);
   }
 
-  if (isOverlap({ ...cur, ...updates }, id)) {
-    window.alert('Overlap!');
-    return;
-  }
-
-=======
-   if (cur.dnc && roomChanging) {
-  requestDncOverride?.(
-    cur,
-    { name: updates.roomName }
-  );
-  return;
-}
-
-  
-
-  if (isOverlap({ ...cur, ...updates }, id)) {
-    window.alert('Overlap!');
-    return;
-  }
-
->>>>>>> main
-  onUpdateBooking(id, updates);
-}
-
- const getDayOccupancy = (day) => {
-  const dateStr = format(day, 'yyyy-MM-dd');
-  const d = new Date(dateStr);
-  const occupied = rooms.filter(r =>
-    bookings.some(b =>
-      b.roomName === r.name &&
-      new Date(b.arrival) <= d && new Date(b.departure) > d &&
-      !['cancelled', 'no-show'].includes(b.status) // ← removed 'blocked' from exclude list
-    )
-  ).length;
-  return { occupied, rate: rooms.length > 0 ? Math.round((occupied / rooms.length) * 100) : 0 };
-};
+  const getDayOccupancy = (day) => {
+    const dateStr = format(day, 'yyyy-MM-dd');
+    const d = new Date(dateStr);
+    const occupied = rooms.filter(r =>
+      bookings.some(b =>
+        b.roomName === r.name &&
+        new Date(b.arrival) <= d && new Date(b.departure) > d &&
+        !['cancelled', 'no-show'].includes(b.status)
+      )
+    ).length;
+    return { occupied, rate: rooms.length > 0 ? Math.round((occupied / rooms.length) * 100) : 0 };
+  };
 
   const getCatAvailableOnDay = (cat, day) => {
-  const catRooms = rooms.filter(r => r.category === cat);
-  const d = new Date(format(day, 'yyyy-MM-dd'));
-  const occupied = catRooms.filter(r =>
-    bookings.some(b =>
-      b.roomName === r.name &&
-      new Date(b.arrival) <= d && new Date(b.departure) > d &&
-      !['cancelled', 'no-show'].includes(b.status) // ← removed 'blocked' from exclude list
-    )
-  ).length;
-  return catRooms.length - occupied;
-};
+    const catRooms = rooms.filter(r => r.category === cat);
+    const d = new Date(format(day, 'yyyy-MM-dd'));
+    const occupied = catRooms.filter(r =>
+      bookings.some(b =>
+        b.roomName === r.name &&
+        new Date(b.arrival) <= d && new Date(b.departure) > d &&
+        !['cancelled', 'no-show'].includes(b.status)
+      )
+    ).length;
+    return catRooms.length - occupied;
+  };
 
   const catCount = {};
   rooms.forEach(r => { catCount[r.category] = (catCount[r.category] || 0) + 1; });
@@ -770,11 +621,8 @@ function handleUpdateBooking(id, updates) {
 
   const hideScrollbar = { scrollbarWidth:'none', msOverflowStyle:'none' };
 
-
-
   return (
     <div ref={containerRef} style={{ flex:1, overflow:'hidden', border:'1px solid #c8cacf', borderRadius:6, background:'#fff', display:'flex', flexDirection:'column', height:'100%' }}>
-      
       <style>{`.cal-scroll::-webkit-scrollbar{display:none}`}</style>
       <div className="cal-scroll" style={{ flex:1, overflowY:'auto', overflowX:'hidden', ...hideScrollbar }}>
         <div style={{ width:'100%', minWidth:days.length*cellWidth+ROOM_COL_WIDTH }}>
@@ -810,10 +658,10 @@ function handleUpdateBooking(id, updates) {
                       return (
                         <div key={format(day,'yyyy-MM-dd')} style={{ width:cellWidth, minWidth:cellWidth, maxWidth:cellWidth, height:'100%', flexShrink:0, borderRight:'1px solid rgba(0,0,0,0.07)', cursor:occupied?'default':'pointer', zIndex:1, background:isToday?'rgba(21,101,192,0.10)':isWeekend?'rgba(0,0,0,0.04)':'transparent' }}
                           onClick={(e) => {
-  if (!occupied) {
-    onCellClick(room.name, day); // directly open big form
-  }
-}} />
+                            if (!occupied) {
+                              onCellClick(room.name, day);
+                            }
+                          }} />
                       );
                     })}
                     {getRoomBookings(room.name).map(booking => {
@@ -885,12 +733,13 @@ function handleUpdateBooking(id, updates) {
           </div>
         </div>
       </div>
-<CategoryMonthlySummary
-  rooms={rooms}
-  bookings={bookings}
-  selectedDate={selectedDate}
-  categoryColors={categoryColors}
-/>
+
+      <CategoryMonthlySummary
+        rooms={rooms}
+        bookings={bookings}
+        selectedDate={selectedDate}
+        categoryColors={categoryColors}
+      />
 
       {contextMenu && (
         <ContextMenu x={contextMenu.x} y={contextMenu.y} booking={contextMenu.booking}
