@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addMonths, subMonths, format } from 'date-fns';
 
 // ── Components ─────────────────────────────────────────────────────────────────
 import CalendarView from './components/CalendarView.jsx';
-import BookingForm from './components/BookingForm.jsx';
 import Modal from './components/Modal.jsx';
 import DncManager from './components/DncManager';
 
@@ -18,6 +17,7 @@ import { sortRoomList } from './utils/roomUtils.js';
 import RoomCategoryPage from './pages/RoomCategoryPage.jsx';
 import RoomNoPage from './pages/RoomNoPage.jsx';
 import NewReservationPage from './pages/NewReservationPage.jsx';
+import MultiRoomReservationPage from './pages/MultiRoomReservationPage.jsx';
 import ViewReservationPage from './pages/ViewReservationPage.jsx';
 import ViewTariffPage from './pages/ViewTariffPage.jsx';
 import EditTariffPage from './pages/EditTariffPage.jsx';
@@ -27,101 +27,94 @@ import SeasonConfigPage from './pages/SeasonConfigPage.jsx';
 import FloorPage from './pages/FloorPage.jsx';
 import Dashboard2 from './pages/Dashboard2.jsx';
 
-// ══════════════════════════════════════════════════════════════════════════════
-function DncApprovalPopup({ booking, onApprove, onCancel }) {
-  const [reason, setReason] = useState('');
-
-  return (
-    <div style={{ width: 500, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <h3 style={{ margin: 0, color: '#c0392b' }}>DNC Override Required</h3>
-      <div style={{ fontSize: '0.95rem', color: '#555' }}>
-        This reservation is DNC locked. Only admin can change this room. Enter a reason before proceeding.
-      </div>
-      <div style={{ border: '1px solid #f5b7b1', borderRadius: 10, padding: 16, background: '#fff5f5' }}>
-        <div style={{ fontWeight: 700 }}>Booking</div>
-        <div style={{ marginTop: 8 }}>{booking?.guestName}</div>
-        <div style={{ color: '#666' }}>Room {booking?.roomName}</div>
-        <div style={{ marginTop: 10, display: 'inline-block', padding: '6px 12px', borderRadius: 20, background: '#fdecea', color: '#e74c3c', fontWeight: 700, fontSize: '0.8rem' }}>
-          DNC Locked
-        </div>
-      </div>
-      <div>
-        <div style={{ fontWeight: 600 }}>Override reason</div>
-        <textarea
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Required for audit tracking"
-          rows={5}
-          style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ddd', resize: 'none' }}
-        />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-        <button onClick={onCancel}>Cancel</button>
-        <button
-          onClick={() => {
-            if (!reason.trim()) { alert('Override reason is required.'); return; }
-            onApprove(reason);
-          }}
-          style={{ background: '#c0392b', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8 }}
-        >
-          Confirm Override
-        </button>
-      </div>
-    </div>
-  );
+// ── Helpers ───────────────────────────────────────────────────────────────────
+/**
+ * Parse a room's floor value into a sortable integer.
+ * Basement → -1, Ground → 0, numeric string → that number,
+ * fallback derives from room name (e.g. "302" → floor 3).
+ */
+function parseFloor(r) {
+  if (r.floor !== undefined && r.floor !== null && r.floor !== '') {
+    if (r.floor === 'Basement') return -1;
+    if (r.floor === 'Ground')   return 0;
+    const p = parseInt(r.floor);
+    if (!isNaN(p)) return p;
+  }
+  const n = parseInt(r.name);
+  if (isNaN(n) || n < 100) return 1;
+  return Math.floor(n / 100);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════════════════════════
 function App() {
-  const [travelAgents, setTravelAgents] = useState([]);
-  const [seasons, setSeasons] = useState([]);
-  const [travelAgentRates, setTravelAgentRates] = useState([]);
-  const [thirdParties, setThirdParties] = useState(initialThirdParties);
-  const [showCalendar, setShowCalendar] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [bookings, setBookings] = useState(sampleBookings);
-  const [rooms, setRooms] = useState(() => sortRoomList(initialRooms));
-  const [categoryColors, setCategoryColors] = useState(initialCategoryColors);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalBooking, setModalBooking] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [guestTagFilter, setGuestTagFilter] = useState('all');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activePage, setActivePage] = useState(null);
-  const [expandedMenu, setExpandedMenu] = useState(null);
-  const [blockModalOpen, setBlockModalOpen] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(false);
-  const [blockForm, setBlockForm] = useState({ category: '', roomName: '', reason: '', arrival: '', departure: '' });
-  const [floorFilter, setFloorFilter] = useState('all');
-  const [editingBooking, setEditingBooking] = useState(null);
-  const [dncOverrideOpen, setDncOverrideOpen] = useState(false);
-  const [dncBooking, setDncBooking] = useState(null);
-  const [dncTargetRoom, setDncTargetRoom] = useState(null);
-  const [dncAfterApprove, setDncAfterApprove] = useState(null); // ✅ moved here, top-level
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  // Read once on mount; avoids JSON.parse on every render.
+  const [loggedUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rms_loggedIn') || '{"name":"Admin","role":"Administrator"}');
+    } catch {
+      return { name: 'Admin', role: 'Administrator' };
+    }
+  });
 
+  // ── Core data ─────────────────────────────────────────────────────────────
+  const [travelAgents,     setTravelAgents]     = useState([]);
+  const [seasons,          setSeasons]           = useState([]);
+  const [travelAgentRates, setTravelAgentRates]  = useState([]);
+  const [thirdParties,     setThirdParties]      = useState(initialThirdParties);
+  const [bookings,         setBookings]          = useState(sampleBookings);
+  const [rooms,            setRooms]             = useState(() => sortRoomList(initialRooms));
+  const [categoryColors,   setCategoryColors]    = useState(initialCategoryColors);
+
+  // ── UI state ──────────────────────────────────────────────────────────────
+  const [showCalendar,   setShowCalendar]   = useState(true);
+  const [showDashboard,  setShowDashboard]  = useState(false);
+  const [selectedDate,   setSelectedDate]   = useState(new Date());
+  const [filterStatus,   setFilterStatus]   = useState('all');
+  const [guestTagFilter, setGuestTagFilter] = useState('all');
+  const [searchQuery,    setSearchQuery]    = useState('');
+  const [debouncedSearch,setDebouncedSearch]= useState('');
+  const [isSearching,    setIsSearching]    = useState(false);
+  const [sidebarOpen,    setSidebarOpen]    = useState(false);
+  const [activePage,     setActivePage]     = useState(null);
+  const [expandedMenu,   setExpandedMenu]   = useState(null);
+  const [floorFilter,    setFloorFilter]    = useState('all');
+  const [editingBooking, setEditingBooking] = useState(null);
+  const [modalOpen,      setModalOpen]      = useState(false);  // kept for future modal use
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [blockForm,      setBlockForm]      = useState({ category: '', roomName: '', reason: '', arrival: '', departure: '' });
+
+  // ── DNC override state ────────────────────────────────────────────────────
+  const [dncOverrideOpen, setDncOverrideOpen] = useState(false);
+  const [dncBooking,      setDncBooking]      = useState(null);
+  const [dncTargetRoom,   setDncTargetRoom]   = useState(null);
+  /**
+   * Storing a function in state requires the () => fn pattern so React
+   * doesn't invoke it immediately as an updater. Always set via:
+   *   setDncAfterApprove(() => myCallback)
+   * and read via:
+   *   if (dncAfterApprove) dncAfterApprove()
+   */
+  const [dncAfterApprove, setDncAfterApprove] = useState(null);
+
+  // ── Floors ────────────────────────────────────────────────────────────────
   const [floors, setFloors] = useState(() =>
-    [...new Set(
-      initialRooms.map(r => {
-        if (r.floor !== undefined && r.floor !== null && r.floor !== '') {
-          if (r.floor === 'Basement') return -1;
-          if (r.floor === 'Ground') return 0;
-          const parsed = parseInt(r.floor);
-          if (!isNaN(parsed)) return parsed;
-        }
-        const n = parseInt(r.name);
-        if (isNaN(n) || n < 100) return 1;
-        return Math.floor(n / 100);
-      })
-    )].sort((a, b) => a - b)
+    [...new Set(initialRooms.map(parseFloor))].sort((a, b) => a - b)
   );
 
-  const loggedUser = JSON.parse(localStorage.getItem('rms_loggedIn') || '{"name":"Admin"}');
+  // Keep floors in sync when rooms change.
+  // This reconciles — stale floors that no longer have any room are removed.
+  useEffect(() => {
+    const activeFloors = [...new Set(rooms.map(parseFloor))].sort((a, b) => a - b);
+    setFloors(prev => {
+      const next = JSON.stringify(activeFloors);
+      return JSON.stringify(prev) === next ? prev : activeFloors;
+    });
+  }, [rooms]);
 
+  // Re-sort rooms whenever the list length changes (e.g. add/delete).
   useEffect(() => {
     setRooms(prev => {
       const sorted = sortRoomList(prev);
@@ -130,26 +123,7 @@ function App() {
     });
   }, [rooms.length]);
 
-  // Keep floors in sync when rooms are added/removed
-  useEffect(() => {
-    const roomFloors = rooms.map(r => {
-      if (r.floor !== undefined && r.floor !== null && r.floor !== '') {
-        if (r.floor === 'Basement') return -1;
-        if (r.floor === 'Ground') return 0;
-        const parsed = parseInt(r.floor);
-        if (!isNaN(parsed)) return parsed;
-      }
-      const n = parseInt(r.name);
-      if (isNaN(n) || n < 100) return 1;
-      return Math.floor(n / 100);
-    });
-    const uniqueFloors = [...new Set(roomFloors)].sort((a, b) => a - b);
-    setFloors(prev => {
-      const merged = [...new Set([...prev, ...uniqueFloors])].sort((a, b) => a - b);
-      return JSON.stringify(merged) === JSON.stringify(prev) ? prev : merged;
-    });
-  }, [rooms.length]);
-
+  // ── Search debounce ───────────────────────────────────────────────────────
   useEffect(() => {
     setIsSearching(true);
     const timer = setTimeout(() => {
@@ -159,100 +133,163 @@ function App() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  function isOverlap(newItem, ignoreId = null) {
-    const arr1 = new Date(newItem.arrival), dep1 = new Date(newItem.departure);
+  // ── Overlap check (single source of truth) ────────────────────────────────
+  /**
+   * Returns true if newItem overlaps any existing booking for the same room.
+   * Pass ignoreId to exclude the booking being edited.
+   */
+  const isOverlap = useCallback((newItem, ignoreId = null) => {
+    const arr1 = new Date(newItem.arrival);
+    const dep1 = new Date(newItem.departure);
     return bookings.some(b => {
       if (b.roomName !== newItem.roomName) return false;
-      if (ignoreId && b.id === ignoreId) return false;
-      const arr2 = new Date(b.arrival), dep2 = new Date(b.departure);
+      if (ignoreId && b.id === ignoreId)   return false;
+      const arr2 = new Date(b.arrival);
+      const dep2 = new Date(b.departure);
       return arr1 < dep2 && arr2 < dep1 && !['cancelled', 'no-show'].includes(b.status);
     });
-  }
+  }, [bookings]);
 
-  const normalizedBookings = bookings.flatMap((b) => {
-    if (b.rooms?.length) {
-      return b.rooms.map((room, idx) => ({
-        ...b,
-        roomName: room.roomName,
-        roomCategory: room.roomCategory,
-        occupancy: room.occupancy || 1,
-        extraPersons: room.extraPersons || 0,
-        baseRate: room.rate || b.baseRate || 0,
-        dnc: room.dnc || false,
-        multiRoomIndex: idx + 1
-      }));
-    }
-    return [{ ...b, dnc: b.tags?.includes('DNC') || false }];
-  });
+  // ── Derived booking lists (memoized) ──────────────────────────────────────
+  /**
+   * Flatten multi-room bookings into one row per room so the calendar
+   * can render each room independently.
+   */
+  const normalizedBookings = useMemo(() =>
+    bookings.flatMap(b => {
+      if (b.rooms?.length) {
+        return b.rooms.map((room, idx) => ({
+          ...b,
+          roomName:      room.roomName,
+          roomCategory:  room.roomCategory,
+          occupancy:     room.occupancy     || 1,
+          extraPersons:  room.extraPersons  || 0,
+          baseRate:      room.rate || b.baseRate || 0,
+          dnc:           room.dnc           || false,
+          multiRoomIndex: idx + 1,
+        }));
+      }
+      return [{ ...b, dnc: b.tags?.includes('DNC') || false }];
+    }),
+  [bookings]);
 
-  const filteredBookings = normalizedBookings.filter((b) => {
+  const filteredBookings = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
-    const matchStatus = filterStatus === 'all' || b.status === filterStatus;
-    const matchTag =
-      guestTagFilter === 'all' ||
-      (guestTagFilter === 'VIP' && b.tags?.includes('VIP')) ||
-      (guestTagFilter === 'DNC' && b.tags?.includes('DNC'));
+    return normalizedBookings.filter(b => {
+      const matchStatus = filterStatus === 'all' || b.status === filterStatus;
+      const matchTag =
+        guestTagFilter === 'all' ||
+        (guestTagFilter === 'VIP' && b.tags?.includes('VIP')) ||
+        (guestTagFilter === 'DNC' && b.tags?.includes('DNC'));
 
-    if (!q) return matchStatus && matchTag;
+      // Always hide cancelled from other status views
+      if (filterStatus !== 'cancelled' && b.status === 'cancelled') return false;
 
-    const searchableFields = [
-      b.guestName || '',
-      b.bookingId || '',
-      b.roomName || '',
-      b.source || '',
-      b.otaPlatform || '',
-    ].join(' ').toLowerCase();
+      if (!q) return matchStatus && matchTag;
 
-    const matchSearch = searchableFields.includes(q);
-    if (filterStatus !== 'cancelled' && b.status === 'cancelled') return false;
-    return matchStatus && matchTag && matchSearch;
-  });
+      const haystack = [
+        b.guestName   || '',
+        b.bookingId   || '',
+        b.roomName    || '',
+        b.source      || '',
+        b.otaPlatform || '',
+      ].join(' ').toLowerCase();
 
-  const handleSaveBooking = (data) => {
-    if (isOverlap(data, data.id)) { alert('Room overlap!'); return; }
-    const now = new Date().toISOString();
-    setBookings(prev => data.id && prev.find(b => b.id === data.id)
-      ? prev.map(b => b.id === data.id ? { ...b, ...data, timestamp: now } : b)
-      : [...prev, { ...data, id: data.id || `b${Date.now()}`, timestamp: now }]
+      return matchStatus && matchTag && haystack.includes(q);
+    });
+  }, [normalizedBookings, filterStatus, guestTagFilter, debouncedSearch]);
+
+  // ── Stats (memoized) ──────────────────────────────────────────────────────
+  const { activeToday, occupancyRate, pendingPayment, checkinsToday, checkoutsToday } = useMemo(() => {
+    const now     = new Date();
+    const todayStr = format(now, 'yyyy-MM-dd');
+    const valid   = normalizedBookings.filter(b => rooms.some(r => r.name === b.roomName));
+
+    const activeToday = valid.filter(b =>
+      new Date(b.arrival) <= now &&
+      new Date(b.departure) > now &&
+      !['cancelled', 'no-show', 'blocked'].includes(b.status)
     );
-    setModalOpen(false);
-    setModalBooking(null);
-  };
 
-  const handleUpdateBooking = (id, updates) => {
+    return {
+      activeToday,
+      occupancyRate:   rooms.length > 0 ? Math.round((activeToday.length / rooms.length) * 100) : 0,
+      pendingPayment:  valid.filter(b => b.paymentStatus === 'due' || b.paymentStatus === 'partial').length,
+      checkinsToday:   valid.filter(b => b.arrival   === todayStr && !['cancelled', 'no-show', 'blocked'].includes(b.status)).length,
+      checkoutsToday:  valid.filter(b => b.departure === todayStr && !['cancelled', 'no-show', 'blocked'].includes(b.status)).length,
+    };
+  }, [normalizedBookings, rooms]);
+
+  // ── Booking handlers ──────────────────────────────────────────────────────
+  const handleSaveBooking = useCallback((data) => {
+    // Multi-room bookings carry a `rooms[]` array; each room was already
+    // validated for overlap inside MultiRoomReservationPage.
+    // Single-room bookings are checked here against the canonical list.
+    if (!data.isMultiRoom && isOverlap(data, data.id)) {
+      alert('Room overlap! Please choose different dates or a different room.');
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    setBookings(prev => {
+      const exists = data.id && prev.find(b => b.id === data.id);
+      return exists
+        ? prev.map(b => b.id === data.id ? { ...b, ...data, timestamp: now } : b)
+        : [...prev, { ...data, id: data.id || `b${Date.now()}`, timestamp: now }];
+    });
+
+    setModalOpen(false);
+    setEditingBooking(null);
+    setActivePage(null);
+    setShowCalendar(true);
+  }, [isOverlap]);
+
+  const handleUpdateBooking = useCallback((id, updates) => {
     const cur = bookings.find(b => b.id === id);
     if (!cur) return;
-    if (isOverlap({ ...cur, ...updates }, id)) { alert('Overlap!'); return; }
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates, timestamp: new Date().toISOString() } : b));
-  };
+    if (isOverlap({ ...cur, ...updates }, id)) {
+      alert('Overlap! Dates conflict with an existing booking.');
+      return;
+    }
+    setBookings(prev =>
+      prev.map(b => b.id === id ? { ...b, ...updates, timestamp: new Date().toISOString() } : b)
+    );
+  }, [bookings, isOverlap]);
 
-  const requestDncOverride = (booking, targetRoom = null, afterApprove = null) => {
+  // ── DNC handlers ──────────────────────────────────────────────────────────
+  const requestDncOverride = useCallback((booking, targetRoom = null, afterApprove = null) => {
     setDncBooking(booking);
     setDncTargetRoom(targetRoom);
+    // () => afterApprove stores the function, not its return value.
     setDncAfterApprove(() => afterApprove);
     setDncOverrideOpen(true);
-  };
+  }, []);
 
-  const handleDncApprove = (reason) => {
-    if (!reason.trim()) { alert('Override reason is required'); return; }
+  const handleDncApprove = useCallback((payload) => {
+    const reason = typeof payload === 'string' ? payload : payload?.reason || '';
+    if (!reason.trim()) {
+      alert('Override reason is required');
+      return;
+    }
 
     setBookings(prev =>
       prev.map(b =>
-        b.id === dncBooking.id
+        b.id === dncBooking?.id
           ? {
               ...b,
               roomName: dncTargetRoom?.name || b.roomName,
               auditTrail: [
                 ...(b.auditTrail || []),
                 {
-                  action: 'DNC_OVERRIDE',
-                  admin: loggedUser?.name || 'Admin',
+                  action:       'DNC_OVERRIDE',
+                  admin:        loggedUser?.name || 'Admin',
                   reason,
                   previousRoom: b.roomName,
-                  newRoom: dncTargetRoom?.name || b.roomName,
-                  timestamp: new Date().toISOString()
-                }
-              ]
+                  newRoom:      dncTargetRoom?.name || b.roomName,
+                  timestamp:    new Date().toISOString(),
+                },
+              ],
             }
           : b
       )
@@ -260,56 +297,74 @@ function App() {
 
     if (dncAfterApprove) dncAfterApprove();
 
+    setDncOverrideOpen(false);
+    setDncBooking(null);
+    setDncTargetRoom(null);
+    setDncAfterApprove(null);
     setActivePage(null);
+  }, [dncBooking, dncTargetRoom, dncAfterApprove, loggedUser]);
+
+  const handleDncCancel = useCallback(() => {
     setDncOverrideOpen(false);
     setDncBooking(null);
     setDncTargetRoom(null);
     setDncAfterApprove(null);
-  };
+  }, []);
 
-  const handleDncCancel = () => {
-    setDncOverrideOpen(false);
-    setDncBooking(null);
-    setDncTargetRoom(null);
-    setDncAfterApprove(null);
-  };
+  // ── Quick-book (from calendar cell click) ─────────────────────────────────
+  const handleQuickBook = useCallback((data) => {
+    if (isOverlap(data)) { alert('Room overlap!'); return; }
+    setBookings(prev => [...prev, { ...data, id: `b${Date.now()}`, timestamp: new Date().toISOString() }]);
+  }, [isOverlap]);
 
-  const handleQuickBook = (data) => {
-    if (isOverlap(data)) { alert('Overlap!'); return; }
-    setBookings(prev => [...prev, { ...data, timestamp: new Date().toISOString() }]);
-  };
-
-  const handleContextAction = (action, booking) => {
+  // ── Context-menu actions ──────────────────────────────────────────────────
+  const handleContextAction = useCallback((action, booking) => {
     switch (action) {
       case 'edit':
       case 'view':
-      case 'note':
-      case 'changeroom':
         setEditingBooking(booking);
-        setActivePage('new-reservation');
+        setActivePage(booking.isMultiRoom ? 'multi-room-reservation' : 'new-reservation');
         break;
+
+      case 'note':
+        // TODO: open a focused note/comment panel instead of full edit
+        setEditingBooking(booking);
+        setActivePage(booking.isMultiRoom ? 'multi-room-reservation' : 'new-reservation');
+        break;
+
+      case 'changeroom':
+        // TODO: open a dedicated room-change dialog
+        setEditingBooking(booking);
+        setActivePage(booking.isMultiRoom ? 'multi-room-reservation' : 'new-reservation');
+        break;
+
       case 'checkin':
         handleUpdateBooking(booking.id, { status: 'checked-in' });
         break;
+
       case 'checkout':
         handleUpdateBooking(booking.id, { status: 'checked-out' });
         break;
+
       case 'cancel':
       case 'unblock':
         handleUpdateBooking(booking.id, { status: 'cancelled' });
         break;
+
       default:
         break;
     }
-  };
+  }, [handleUpdateBooking]);
 
-  const handleAddCategory = (name, numRooms) => {
+  // ── Room / Category handlers ──────────────────────────────────────────────
+  const handleAddCategory = useCallback((name, numRooms) => {
     const color = AUTO_COLORS[Object.keys(categoryColors).length % AUTO_COLORS.length];
     let newRooms = [];
+
     if (numRooms && !isNaN(numRooms) && numRooms > 0) {
       const existingNumbers = rooms.map(r => parseInt(r.name)).filter(n => !isNaN(n));
-      let startNum = 101;
-      if (existingNumbers.length > 0) startNum = Math.max(...existingNumbers) + 1;
+      let startNum = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 101;
+
       for (let i = 0; i < numRooms; i++) {
         let rn = String(startNum + i);
         while (rooms.some(r => r.name === rn) || newRooms.some(r => r.name === rn)) {
@@ -319,109 +374,115 @@ function App() {
         newRooms.push({ name: rn, category: name, floor: '1' });
       }
     }
+
     setCategoryColors(prev => ({ ...prev, [name]: color }));
     if (newRooms.length > 0) setRooms(sortRoomList([...rooms, ...newRooms]));
-  };
+  }, [categoryColors, rooms]);
 
-  const handleDeleteCategory = (name) => {
-    if (rooms.some(r => r.category === name)) { alert(`Cannot delete "${name}" — rooms exist in this category`); return; }
+  const handleDeleteCategory = useCallback((name) => {
+    if (rooms.some(r => r.category === name)) {
+      alert(`Cannot delete "${name}" — rooms exist in this category`);
+      return;
+    }
     if (!window.confirm(`Delete category "${name}"?`)) return;
     setCategoryColors(prev => { const n = { ...prev }; delete n[name]; return n; });
-  };
+  }, [rooms]);
 
-  const handleAddRoom = (room) => {
+  const handleAddRoom = useCallback((room) => {
     if (rooms.some(r => r.name === room.name)) return;
-    const roomWithFloor = { ...room, floor: room.floor || '1' };
-    setRooms(sortRoomList([...rooms, roomWithFloor]));
-  };
+    setRooms(sortRoomList([...rooms, { ...room, floor: room.floor || '1' }]));
+  }, [rooms]);
 
-  const handleDeleteRoom = (name) => {
-    if (bookings.some(b => b.roomName === name && !['cancelled', 'no-show'].includes(b.status))) { alert('Cannot delete room with active bookings'); return; }
+  const handleDeleteRoom = useCallback((name) => {
+    if (bookings.some(b => b.roomName === name && !['cancelled', 'no-show'].includes(b.status))) {
+      alert('Cannot delete room with active bookings');
+      return;
+    }
     if (!window.confirm(`Delete room ${name}?`)) return;
     setRooms(prev => prev.filter(r => r.name !== name));
-  };
+  }, [bookings]);
 
-  const handleBlockSubmit = (e) => {
+  // ── Block room ────────────────────────────────────────────────────────────
+  const handleBlockSubmit = useCallback((e) => {
     e.preventDefault();
     if (!blockForm.roomName || !blockForm.arrival || !blockForm.departure) return;
+
     const newBlock = {
-      id: `block-${Date.now()}`, guestName: blockForm.reason || 'Blocked',
-      roomName: blockForm.roomName, status: 'blocked',
-      arrival: blockForm.arrival, departure: blockForm.departure,
-      paymentStatus: 'paid', numGuests: 0, mealPlan: '—',
-      notes: blockForm.reason, timestamp: new Date().toISOString(), comments: []
+      id:            `block-${Date.now()}`,
+      guestName:     blockForm.reason || 'Blocked',
+      roomName:      blockForm.roomName,
+      status:        'blocked',
+      arrival:       blockForm.arrival,
+      departure:     blockForm.departure,
+      paymentStatus: 'paid',
+      numGuests:     0,
+      mealPlan:      '—',
+      notes:         blockForm.reason,
+      timestamp:     new Date().toISOString(),
+      comments:      [],
     };
+
     if (isOverlap(newBlock)) { alert('Room overlap!'); return; }
+
     setBookings(prev => [...prev, newBlock]);
     setBlockModalOpen(false);
     setBlockForm({ category: '', roomName: '', reason: '', arrival: '', departure: '' });
-  };
+  }, [blockForm, isOverlap]);
 
-  // Stats
-  const now2 = new Date();
-  const todayStr = format(now2, 'yyyy-MM-dd');
+  // ── Derived UI data ───────────────────────────────────────────────────────
+  const sortedCategories = useMemo(() =>
+    Object.keys(categoryColors).sort(
+      (a, b) => rooms.filter(r => r.category === a).length - rooms.filter(r => r.category === b).length
+    ),
+  [categoryColors, rooms]);
 
-  const validBookings = normalizedBookings.filter(b => rooms.some(r => r.name === b.roomName));
-
-  const activeToday = validBookings.filter(b =>
-    new Date(b.arrival) <= now2 &&
-    new Date(b.departure) > now2 &&
-    !['cancelled', 'no-show', 'blocked'].includes(b.status)
+  const roomsInCat = useCallback(
+    (cat) => rooms.filter(r => r.category === cat).map(r => r.name),
+    [rooms]
   );
 
-  const occupancyRate = rooms.length > 0 ? Math.round((activeToday.length / rooms.length) * 100) : 0;
-
-  const pendingPayment = validBookings.filter(b => b.paymentStatus === 'due' || b.paymentStatus === 'partial').length;
-
-  const checkinsToday = validBookings.filter(b =>
-    b.arrival === todayStr && !['cancelled', 'no-show', 'blocked'].includes(b.status)
-  ).length;
-
-  const checkoutsToday = validBookings.filter(b =>
-    b.departure === todayStr && !['cancelled', 'no-show', 'blocked'].includes(b.status)
-  ).length;
-
-  const sortedCategories = Object.keys(categoryColors).sort(
-    (a, b) => rooms.filter(r => r.category === a).length - rooms.filter(r => r.category === b).length
-  );
-
+  // ── Sidebar menu definition ───────────────────────────────────────────────
   const sidebarMenus = [
     {
       key: 'room', label: '🛏️ Room Management',
       children: [
-        { key: 'room-category', label: 'Room Category' },
-        { key: 'room-floor', label: 'Floor' },
-        { key: 'room-no', label: 'Room No.' },
-        { key: 'room-tariff', label: 'View Tariff' },
-        { key: 'room-edit-tariff', label: 'Edit Tariff' },
+        { key: 'room-category',   label: 'Room Category' },
+        { key: 'room-floor',      label: 'Floor' },
+        { key: 'room-no',         label: 'Room No.' },
+        { key: 'room-tariff',     label: 'View Tariff' },
+        { key: 'room-edit-tariff',label: 'Edit Tariff' },
       ],
     },
     {
       key: 'reservation', label: '📋 Reservation',
       children: [
-        { key: 'new-reservation', label: 'New Reservation' },
-        { key: 'view-reservation', label: 'View Reservation Details' },
-        { key: 'cancel-list', label: 'Cancel List' },
-        { key: 'travel-agent', label: 'Travel Agent/Third Party' },
-        { key: 'season-config', label: 'Season Configuration' },
-        { key: 'travel-agent-rate', label: 'Travel Agent Rate Configuration' },
+        { key: 'new-reservation',       label: 'New Reservation' },
+        { key: 'view-reservation',      label: 'View Reservation Details' },
+        { key: 'cancel-list',           label: 'Cancel List' },
+        { key: 'travel-agent',          label: 'Travel Agent/Third Party' },
+        { key: 'season-config',         label: 'Season Configuration' },
+        { key: 'travel-agent-rate',     label: 'Travel Agent Rate Configuration' },
       ],
     },
   ];
 
+  // ── Shared inline styles (kept minimal — move to CSS file when ready) ──────
   const btn = { padding: '6px 14px', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem' };
   const inp = { padding: '6px 9px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box', outline: 'none' };
   const lbl = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.82rem', color: '#444' };
-  const roomsInCat = (cat) => rooms.filter(r => r.category === cat).map(r => r.name);
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f0f2f5', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
 
       {/* ── Top Bar ── */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1a1a2e', padding: '0 18px', height: 48, flexShrink: 0, gap: 10, zIndex: 200 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button onClick={() => setSidebarOpen(p => !p)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '1.2rem', padding: '4px 6px', borderRadius: 5, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center' }}>
+          <button
+            onClick={() => setSidebarOpen(p => !p)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '1.2rem', padding: '4px 6px', borderRadius: 5, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center' }}
+            aria-label="Toggle sidebar"
+          >
             <span style={{ display: 'block', width: 20, height: 2, background: '#fff', borderRadius: 2 }} />
             <span style={{ display: 'block', width: 20, height: 2, background: '#fff', borderRadius: 2 }} />
             <span style={{ display: 'block', width: 20, height: 2, background: '#fff', borderRadius: 2 }} />
@@ -437,20 +498,27 @@ function App() {
             📅 Calendar
           </button>
 
-          {showCalendar && <>
-            <button onClick={() => setSelectedDate(new Date())} style={{ ...btn, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '0.75rem', padding: '4px 10px' }}>Today</button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(255,255,255,0.08)', padding: '3px 8px', borderRadius: 6 }}>
-              <button onClick={() => setSelectedDate(p => subMonths(p, 1))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#fff', fontSize: '1rem', padding: '0 4px' }}>‹</button>
-              <span style={{ minWidth: 105, textAlign: 'center', fontWeight: 700, fontSize: '0.82rem', color: '#fff' }}>{format(selectedDate, 'MMMM yyyy')}</span>
-              <button onClick={() => setSelectedDate(p => addMonths(p, 1))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#fff', fontSize: '1rem', padding: '0 4px' }}>›</button>
-            </div>
-          </>}
+          {showCalendar && (
+            <>
+              <button
+                onClick={() => setSelectedDate(new Date())}
+                style={{ ...btn, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '0.75rem', padding: '4px 10px' }}
+              >
+                Today
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(255,255,255,0.08)', padding: '3px 8px', borderRadius: 6 }}>
+                <button onClick={() => setSelectedDate(p => subMonths(p, 1))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#fff', fontSize: '1rem', padding: '0 4px' }}>‹</button>
+                <span style={{ minWidth: 105, textAlign: 'center', fontWeight: 700, fontSize: '0.82rem', color: '#fff' }}>{format(selectedDate, 'MMMM yyyy')}</span>
+                <button onClick={() => setSelectedDate(p => addMonths(p, 1))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#fff', fontSize: '1rem', padding: '0 4px' }}>›</button>
+              </div>
+            </>
+          )}
 
           {showCalendar && (
             <div style={{ position: 'relative', width: 'min(420px, 100%)', flex: 1, minWidth: 220 }}>
               <input
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search by Booking ID / Guest Name / Source"
                 style={{ ...inp, width: '100%', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '0.75rem', padding: '4px 36px 4px 12px' }}
               />
@@ -458,8 +526,10 @@ function App() {
                 <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#fff', fontSize: '0.7rem' }}>⏳</span>
               )}
               {!isSearching && searchQuery && (
-                <button onClick={() => setSearchQuery('')}
-                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.9rem', padding: 2 }}>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.9rem', padding: 2 }}
+                >
                   ✕
                 </button>
               )}
@@ -469,16 +539,22 @@ function App() {
 
         {showCalendar && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => setShowDashboard(p => !p)}
-              style={{ ...btn, background: showDashboard ? '#1e3a8a' : '#2563eb', color: '#fff', fontSize: '0.75rem', padding: '4px 12px', boxShadow: showDashboard ? '0 0 8px rgba(37,99,235,0.4)' : 'none' }}>
+            <button
+              onClick={() => setShowDashboard(p => !p)}
+              style={{ ...btn, background: showDashboard ? '#1e3a8a' : '#2563eb', color: '#fff', fontSize: '0.75rem', padding: '4px 12px', boxShadow: showDashboard ? '0 0 8px rgba(37,99,235,0.4)' : 'none' }}
+            >
               📊 Dashboard
             </button>
-            <button onClick={() => setBlockModalOpen(true)}
-              style={{ ...btn, background: '#7b241c', color: '#fff', fontSize: '0.75rem', padding: '4px 10px' }}>
+            <button
+              onClick={() => setBlockModalOpen(true)}
+              style={{ ...btn, background: '#7b241c', color: '#fff', fontSize: '0.75rem', padding: '4px 10px' }}
+            >
               🚫 Block
             </button>
-            <button onClick={() => { setSidebarOpen(true); setExpandedMenu('reservation'); setActivePage('new-reservation'); }}
-              style={{ ...btn, background: '#1565c0', color: '#fff', fontSize: '0.75rem', padding: '4px 12px' }}>
+            <button
+              onClick={() => { setEditingBooking(null); setSidebarOpen(true); setExpandedMenu('reservation'); setActivePage('new-reservation'); }}
+              style={{ ...btn, background: '#1565c0', color: '#fff', fontSize: '0.75rem', padding: '4px 12px' }}
+            >
               + Reservation
             </button>
           </div>
@@ -492,6 +568,7 @@ function App() {
         <div style={{ width: sidebarOpen ? 240 : 0, minWidth: sidebarOpen ? 240 : 0, background: '#1e2a3a', transition: 'width 0.25s ease, min-width 0.25s ease', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column', zIndex: 100, boxShadow: sidebarOpen ? '4px 0 16px rgba(0,0,0,0.2)' : 'none' }}>
           <div style={{ width: 240, flex: 1, overflowY: 'auto' }}>
 
+            {/* User card */}
             <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #1565c0, #42a5f5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '0.9rem' }}>
                 {loggedUser?.name?.charAt(0).toUpperCase() || 'A'}
@@ -502,29 +579,46 @@ function App() {
               </div>
             </div>
 
-            <div onClick={() => { setActivePage(null); setShowCalendar(true); setShowDashboard(false); setFloorFilter('all'); }}
+            {/* Home */}
+            <div
+              onClick={() => { setActivePage(null); setShowCalendar(true); setShowDashboard(false); setFloorFilter('all'); }}
               style={{ padding: '10px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, color: activePage === null ? '#64b5f6' : 'rgba(255,255,255,0.7)', background: activePage === null ? 'rgba(100,181,246,0.1)' : 'transparent', borderLeft: activePage === null ? '3px solid #64b5f6' : '3px solid transparent', fontSize: '0.85rem', fontWeight: activePage === null ? 700 : 500, transition: 'all 0.15s' }}
               onMouseEnter={e => { if (activePage !== null) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-              onMouseLeave={e => { if (activePage !== null) e.currentTarget.style.background = 'transparent'; }}>
+              onMouseLeave={e => { if (activePage !== null) e.currentTarget.style.background = 'transparent'; }}
+            >
               🏠 <span>Home</span>
             </div>
 
+            {/* Accordion menus */}
             {sidebarMenus.map(menu => (
               <div key={menu.key}>
-                <div onClick={() => setExpandedMenu(expandedMenu === menu.key ? null : menu.key)}
+                <div
+                  onClick={() => setExpandedMenu(expandedMenu === menu.key ? null : menu.key)}
                   style={{ padding: '10px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'rgba(255,255,255,0.85)', background: expandedMenu === menu.key ? 'rgba(255,255,255,0.05)' : 'transparent', fontSize: '0.85rem', fontWeight: 700, transition: 'all 0.15s', borderTop: '1px solid rgba(255,255,255,0.06)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-                  onMouseLeave={e => e.currentTarget.style.background = expandedMenu === menu.key ? 'rgba(255,255,255,0.05)' : 'transparent'}>
+                  onMouseLeave={e => e.currentTarget.style.background = expandedMenu === menu.key ? 'rgba(255,255,255,0.05)' : 'transparent'}
+                >
                   <span>{menu.label}</span>
                   <span style={{ fontSize: '0.7rem', transition: 'transform 0.2s', transform: expandedMenu === menu.key ? 'rotate(180deg)' : 'none' }}>▼</span>
                 </div>
+
                 {expandedMenu === menu.key && (
                   <div style={{ background: 'rgba(0,0,0,0.15)' }}>
                     {menu.children.map(child => (
-                      <div key={child.key} onClick={() => { setActivePage(child.key); setSidebarOpen(true); }}
+                      <div
+                        key={child.key}
+                        onClick={() => {
+                          // Clear editing state when navigating to reservation forms
+                          if (child.key === 'new-reservation' || child.key === 'multi-room-reservation') {
+                            setEditingBooking(null);
+                          }
+                          setActivePage(child.key);
+                          setSidebarOpen(true);
+                        }}
                         style={{ padding: '8px 18px 8px 36px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: activePage === child.key ? '#64b5f6' : 'rgba(255,255,255,0.6)', background: activePage === child.key ? 'rgba(100,181,246,0.12)' : 'transparent', borderLeft: activePage === child.key ? '3px solid #64b5f6' : '3px solid transparent', fontSize: '0.8rem', fontWeight: activePage === child.key ? 700 : 400, transition: 'all 0.12s' }}
                         onMouseEnter={e => { if (activePage !== child.key) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-                        onMouseLeave={e => { if (activePage !== child.key) e.currentTarget.style.background = 'transparent'; }}>
+                        onMouseLeave={e => { if (activePage !== child.key) e.currentTarget.style.background = 'transparent'; }}
+                      >
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: activePage === child.key ? '#64b5f6' : 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
                         {child.label}
                       </div>
@@ -534,9 +628,12 @@ function App() {
               </div>
             ))}
 
+            {/* Logout */}
             <div style={{ marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.08)', padding: 16 }}>
-              <button onClick={() => { localStorage.removeItem('rms_loggedIn'); window.location.reload(); }}
-                style={{ width: '100%', padding: '8px 0', border: '1px solid rgba(255,100,100,0.3)', borderRadius: 6, background: 'rgba(255,0,0,0.1)', color: '#ff8a80', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+              <button
+                onClick={() => { localStorage.removeItem('rms_loggedIn'); window.location.reload(); }}
+                style={{ width: '100%', padding: '8px 0', border: '1px solid rgba(255,100,100,0.3)', borderRadius: 6, background: 'rgba(255,0,0,0.1)', color: '#ff8a80', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+              >
                 🚪 Logout
               </button>
             </div>
@@ -550,19 +647,22 @@ function App() {
               {/* Stats Bar */}
               <div style={{ background: '#fff', borderBottom: '1px solid #e8eaed', padding: '6px 18px', display: 'flex', gap: 16, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
                 {[
-                  { label: 'Occupied', value: activeToday.length, color: '#1e8449' },
-                  { label: 'Occupancy Rate', value: `${occupancyRate}%`, color: occupancyRate > 80 ? '#1e8449' : occupancyRate > 50 ? '#e67e22' : '#e74c3c' },
-                  { label: 'Check-ins Today', value: checkinsToday, color: '#1565c0' },
-                  { label: 'Check-outs Today', value: checkoutsToday, color: '#784212' },
-                  { label: 'Payment Pending', value: pendingPayment, color: '#e74c3c' },
-                  { label: 'Total Rooms', value: rooms.length, color: '#555' },
+                  { label: 'Occupied',        value: activeToday.length,  color: '#1e8449' },
+                  { label: 'Occupancy Rate',  value: `${occupancyRate}%`, color: occupancyRate > 80 ? '#1e8449' : occupancyRate > 50 ? '#e67e22' : '#e74c3c' },
+                  { label: 'Check-ins Today', value: checkinsToday,       color: '#1565c0' },
+                  { label: 'Check-outs Today',value: checkoutsToday,      color: '#784212' },
+                  { label: 'Payment Pending', value: pendingPayment,      color: '#e74c3c' },
+                  { label: 'Total Rooms',     value: rooms.length,        color: '#555' },
                 ].map(({ label, value, color }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <span style={{ fontSize: '1rem', fontWeight: 800, color }}>{value}</span>
                     <span style={{ fontSize: '0.7rem', color: '#888' }}>{label}</span>
                   </div>
                 ))}
+
                 <div style={{ width: 1, height: 18, background: '#e0e0e0', margin: '0 2px' }} />
+
+                {/* Category availability dropdown (read-only summary) */}
                 <select style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.7rem', cursor: 'pointer' }}>
                   {sortedCategories.map(cat => {
                     const catRooms = rooms.filter(r => r.category === cat);
@@ -570,17 +670,30 @@ function App() {
                     return <option key={cat}>{cat} ({catRooms.length - occ} avail / {catRooms.length} total)</option>;
                   })}
                 </select>
+
                 <div style={{ width: 1, height: 18, background: '#e0e0e0', margin: '0 2px' }} />
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}>
-                  {['all', 'confirmed', 'tentative', 'checked-in', 'checked-out', 'cancelled', 'blocked'].map(s => <option key={s} value={s}>{s}</option>)}
+
+                <select
+                  value={filterStatus}
+                  onChange={e => setFilterStatus(e.target.value)}
+                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {['all', 'confirmed', 'tentative', 'checked-in', 'checked-out', 'cancelled', 'blocked'].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
-                <select value={guestTagFilter} onChange={(e) => setGuestTagFilter(e.target.value)}
-                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}>
+
+                <select
+                  value={guestTagFilter}
+                  onChange={e => setGuestTagFilter(e.target.value)}
+                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                >
                   <option value="all">All Guests</option>
                   <option value="VIP">VIP</option>
                   <option value="DNC">DNC</option>
                 </select>
+
+                {/* Category colour legend */}
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
                   {Object.entries(categoryColors).map(([cat, c]) => (
                     <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.65rem' }}>
@@ -591,6 +704,7 @@ function App() {
                 </div>
               </div>
 
+              {/* Dashboard overlay */}
               {showDashboard && (
                 <Dashboard2
                   rooms={floorFilter === 'all' ? rooms : rooms.filter(r => String(r.floor) === String(floorFilter))}
@@ -632,12 +746,29 @@ function App() {
                   <CalendarView
                     requestDncOverride={requestDncOverride}
                     rooms={rooms}
-                    bookings={filteredBookings}                                 
+                    bookings={filteredBookings}
                     selectedDate={selectedDate}
                     categoryColors={categoryColors}
-                    onCellClick={() => { setSidebarOpen(true); setExpandedMenu('reservation'); setActivePage('new-reservation'); }}
-                    onFullEdit={(booking) => { setModalOpen(false); setSidebarOpen(true); setExpandedMenu('reservation'); setActivePage('new-reservation'); setEditingBooking(booking); }}
-                    onBookingDoubleClick={(booking) => { setModalOpen(false); setSidebarOpen(true); setExpandedMenu('reservation'); setActivePage('new-reservation'); setEditingBooking(booking); }}
+                    onCellClick={() => {
+                      setEditingBooking(null);
+                      setSidebarOpen(true);
+                      setExpandedMenu('reservation');
+                      setActivePage('new-reservation');
+                    }}
+                    onFullEdit={booking => {
+                      setModalOpen(false);
+                      setSidebarOpen(true);
+                      setExpandedMenu('reservation');
+                      setEditingBooking(booking);
+                      setActivePage(booking.isMultiRoom ? 'multi-room-reservation' : 'new-reservation');
+                    }}
+                    onBookingDoubleClick={booking => {
+                      setModalOpen(false);
+                      setSidebarOpen(true);
+                      setExpandedMenu('reservation');
+                      setEditingBooking(booking);
+                      setActivePage(booking.isMultiRoom ? 'multi-room-reservation' : 'new-reservation');
+                    }}
                     onUpdateBooking={handleUpdateBooking}
                     onQuickBook={handleQuickBook}
                     onContextAction={handleContextAction}
@@ -646,17 +777,43 @@ function App() {
               </main>
             </>
           ) : (
+            /* ── Page views ── */
             <div style={{ flex: 1, overflowY: 'auto', background: '#f8f9fa' }}>
+              {/* Breadcrumb */}
               <div style={{ background: '#fff', borderBottom: '1px solid #e8eaed', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={() => setActivePage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1565c0', fontSize: '0.82rem', fontWeight: 600, padding: 0 }}>🏠 Home</button>
+                <button
+                  onClick={() => setActivePage(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1565c0', fontSize: '0.82rem', fontWeight: 600, padding: 0 }}
+                >
+                  🏠 Home
+                </button>
                 <span style={{ color: '#ccc' }}>›</span>
-                <span style={{ fontSize: '0.82rem', color: '#555', fontWeight: 600, textTransform: 'capitalize' }}>{activePage?.replace(/-/g, ' ')}</span>
+                <span style={{ fontSize: '0.82rem', color: '#555', fontWeight: 600, textTransform: 'capitalize' }}>
+                  {activePage?.replace(/-/g, ' ')}
+                </span>
               </div>
 
-              {activePage === 'room-category' && <RoomCategoryPage categoryColors={categoryColors} rooms={rooms} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} />}
-              {activePage === 'room-no' && <RoomNoPage rooms={rooms} categoryColors={categoryColors} onAddRoom={handleAddRoom} onDeleteRoom={handleDeleteRoom} />}
+              {activePage === 'room-category' && (
+                <RoomCategoryPage
+                  categoryColors={categoryColors}
+                  rooms={rooms}
+                  onAddCategory={handleAddCategory}
+                  onDeleteCategory={handleDeleteCategory}
+                />
+              )}
+
+              {activePage === 'room-no' && (
+                <RoomNoPage
+                  rooms={rooms}
+                  categoryColors={categoryColors}
+                  onAddRoom={handleAddRoom}
+                  onDeleteRoom={handleDeleteRoom}
+                />
+              )}
+
               {activePage === 'new-reservation' && (
                 <NewReservationPage
+                  key={editingBooking?.id ?? 'new'}   // re-initialise form when booking changes
                   requestDncOverride={requestDncOverride}
                   editingBooking={editingBooking}
                   currentUser={loggedUser}
@@ -670,21 +827,73 @@ function App() {
                   travelAgentRates={travelAgentRates}
                 />
               )}
-              {activePage === 'view-reservation' && <ViewReservationPage bookings={bookings} rooms={rooms} categoryColors={categoryColors} currentUser={loggedUser} travelAgents={travelAgents} seasons={seasons} travelAgentRates={travelAgentRates} onUpdateBooking={handleUpdateBooking} />}
-              {activePage === 'room-tariff' && <ViewTariffPage categoryColors={categoryColors} />}
-              {activePage === 'room-edit-tariff' && <EditTariffPage categoryColors={categoryColors} />}
-              {activePage === 'travel-agent' && (
-                <TravelAgentPage agents={travelAgents} thirdParties={thirdParties} onAgentsChange={setTravelAgents} onThirdPartyChange={setThirdParties} />
+
+              {activePage === 'multi-room-reservation' && (
+                <MultiRoomReservationPage
+                  key={editingBooking?.id ?? 'new'}   // re-initialise form when booking changes
+                  editingBooking={editingBooking}
+                  currentUser={loggedUser}
+                  rooms={rooms}
+                  categoryColors={categoryColors}
+                  bookings={bookings}
+                  onSave={handleSaveBooking}
+                  travelAgents={travelAgents}
+                  thirdParties={thirdParties}
+                  seasons={seasons}
+                  travelAgentRates={travelAgentRates}
+                />
               )}
+
+              {activePage === 'view-reservation' && (
+                <ViewReservationPage
+                  bookings={bookings}
+                  rooms={rooms}
+                  categoryColors={categoryColors}
+                  currentUser={loggedUser}
+                  travelAgents={travelAgents}
+                  seasons={seasons}
+                  travelAgentRates={travelAgentRates}
+                  onUpdateBooking={handleUpdateBooking}
+                />
+              )}
+
+              {activePage === 'room-tariff'      && <ViewTariffPage categoryColors={categoryColors} />}
+              {activePage === 'room-edit-tariff' && <EditTariffPage categoryColors={categoryColors} />}
+
+              {activePage === 'travel-agent' && (
+                <TravelAgentPage
+                  agents={travelAgents}
+                  thirdParties={thirdParties}
+                  onAgentsChange={setTravelAgents}
+                  onThirdPartyChange={setThirdParties}
+                />
+              )}
+
               {activePage === 'season-config' && (
                 <SeasonConfigPage seasons={seasons} onSeasonsChange={setSeasons} />
               )}
+
               {activePage === 'travel-agent-rate' && (
-                <TravelAgentRateConfig agents={travelAgents} seasons={seasons} categoryColors={categoryColors} travelAgentRates={travelAgentRates} onRatesChange={setTravelAgentRates} />
+                <TravelAgentRateConfig
+                  agents={travelAgents}
+                  seasons={seasons}
+                  categoryColors={categoryColors}
+                  travelAgentRates={travelAgentRates}
+                  onRatesChange={setTravelAgentRates}
+                />
               )}
+
               {activePage === 'room-floor' && (
-                <FloorPage floors={floors} rooms={rooms} floorFilter={floorFilter} setFloorFilter={setFloorFilter} setFloors={setFloors} categoryColors={categoryColors} />
+                <FloorPage
+                  floors={floors}
+                  rooms={rooms}
+                  floorFilter={floorFilter}
+                  setFloorFilter={setFloorFilter}
+                  setFloors={setFloors}
+                  categoryColors={categoryColors}
+                />
               )}
+
               {activePage === 'cancel-list' && (
                 <div style={{ padding: 40, textAlign: 'center', color: '#aaa' }}>
                   <div style={{ fontSize: '3rem', marginBottom: 12 }}>🚧</div>
@@ -701,25 +910,48 @@ function App() {
       <Modal open={blockModalOpen} onClose={() => setBlockModalOpen(false)}>
         <form onSubmit={handleBlockSubmit} style={{ width: 340, padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#7b241c' }}>🚫 Block Room</h3>
+
           <label style={lbl}>Category
-            <select value={blockForm.category} onChange={e => setBlockForm({ ...blockForm, category: e.target.value, roomName: '' })} style={inp}>
+            <select
+              value={blockForm.category}
+              onChange={e => setBlockForm({ ...blockForm, category: e.target.value, roomName: '' })}
+              style={inp}
+            >
               <option value="">Select category</option>
               {Object.keys(categoryColors).map(c => <option key={c}>{c}</option>)}
             </select>
           </label>
+
           <label style={lbl}>Room
-            <select value={blockForm.roomName} onChange={e => setBlockForm({ ...blockForm, roomName: e.target.value })} required style={inp}>
+            <select
+              value={blockForm.roomName}
+              onChange={e => setBlockForm({ ...blockForm, roomName: e.target.value })}
+              required
+              style={inp}
+            >
               <option value="">Select room</option>
               {roomsInCat(blockForm.category).map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </label>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <label style={lbl}>From<input type="date" value={blockForm.arrival} onChange={e => setBlockForm({ ...blockForm, arrival: e.target.value })} required style={inp} /></label>
-            <label style={lbl}>To<input type="date" value={blockForm.departure} onChange={e => setBlockForm({ ...blockForm, departure: e.target.value })} required style={inp} /></label>
+            <label style={lbl}>From
+              <input type="date" value={blockForm.arrival}   onChange={e => setBlockForm({ ...blockForm, arrival: e.target.value })}   required style={inp} />
+            </label>
+            <label style={lbl}>To
+              <input type="date" value={blockForm.departure} onChange={e => setBlockForm({ ...blockForm, departure: e.target.value })} required style={inp} />
+            </label>
           </div>
+
           <label style={lbl}>Reason
-            <textarea value={blockForm.reason} onChange={e => setBlockForm({ ...blockForm, reason: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} />
+            <textarea
+              value={blockForm.reason}
+              onChange={e => setBlockForm({ ...blockForm, reason: e.target.value })}
+              rows={2}
+              style={{ ...inp, resize: 'vertical' }}
+            />
           </label>
+
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button type="button" onClick={() => setBlockModalOpen(false)} style={{ ...btn, background: '#f5f5f5', color: '#333', border: '1px solid #ddd' }}>Cancel</button>
             <button type="submit" style={{ ...btn, background: '#7b241c', color: '#fff' }}>Block</button>
@@ -727,6 +959,7 @@ function App() {
         </form>
       </Modal>
 
+      {/* ── DNC Override Manager ── */}
       <DncManager
         open={dncOverrideOpen}
         booking={dncBooking}
