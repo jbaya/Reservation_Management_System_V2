@@ -81,8 +81,8 @@ function RoomNoPage({ rooms, categoryColors, onAddRoom, onDeleteRoom }) {
           <div style={{ marginTop: 12, fontSize: '0.78rem', color: '#888', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Showing {filteredRooms.length} of {rooms.length} rooms</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#f5f5f5', cursor: 'pointer', fontSize: '0.78rem' }}>Previous</button>
-              <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#f5f5f5', cursor: 'pointer', fontSize: '0.78rem' }}>Next</button>
+              <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#757373', cursor: 'pointer', fontSize: '0.78rem' }}>Previous</button>
+              <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#757373', cursor: 'pointer', fontSize: '0.78rem' }}>Next</button>
             </div>
           </div>
         </div>

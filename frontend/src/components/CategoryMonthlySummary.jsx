@@ -48,7 +48,6 @@ function CategoryMonthlySummary({ rooms, bookings, selectedDate, categoryColors 
       <div style={{ fontWeight: 700, fontSize: '0.8rem', marginBottom: 10, color: '#1a1a2e' }}>
         Category-wise Monthly Room Availability
       </div>
-
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
         <thead>
           <tr style={{ background: '#f7f8fa' }}>

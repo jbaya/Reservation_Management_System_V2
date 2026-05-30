@@ -129,7 +129,7 @@ function FloorPage({
                 fontSize: '0.8rem',
                 color: '#555',
                 marginBottom: 6,
-                fontWeight: 600,
+                fontWeight: 500,
               }}
             >
               Select Floor
@@ -139,7 +139,7 @@ function FloorPage({
               value={newFloor.number}
               onChange={(e) => setNewFloor({ number: parseInt(e.target.value) })}
               style={{
-                padding: '10px 12px',
+                padding: '4.5px 12px',
                 borderRadius: 8,
                 border: '1px solid #ddd',
                 minWidth: 220,
@@ -162,13 +162,13 @@ function FloorPage({
           <button
             type="submit"
             style={{
-              padding: '10px 18px',
+              padding: '5px 18px',
               borderRadius: 8,
               border: 'none',
               background: '#16a085',
               color: '#fff',
               cursor: 'pointer',
-              fontWeight: 700,
+              fontWeight: 500,
             }}
           >
             + Add Floor

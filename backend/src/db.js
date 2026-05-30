@@ -1,17 +1,10 @@
-import pkg from 'pg';
+import pg from 'pg';
 import dotenv from 'dotenv';
-
 dotenv.config();
-const { Pool } = pkg;
 
+const { Pool } = pg;
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/rms',
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionString: process.env.DATABASE_URL,
 });
 
-export default {
-  query: (text, params) => pool.query(text, params),
-  pool,
-};
+export default pool;

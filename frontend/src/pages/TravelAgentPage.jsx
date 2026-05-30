@@ -1,4 +1,12 @@
 import { useState } from 'react';
+import {
+  saveAgent,
+  deleteAgent,
+  saveThirdParty,
+  deleteThirdParty,
+  getAgents,
+  getThirdParties
+} from '../api.js';
 
 function TravelAgentPage({ onAgentsChange, onThirdPartyChange, agents = [], thirdParties = [] }) {
   const [tab, setTab] = useState('add');
@@ -11,28 +19,90 @@ function TravelAgentPage({ onAgentsChange, onThirdPartyChange, agents = [], thir
   const inp = { padding: '8px 12px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box', outline: 'none' };
   const lbl = { fontSize: '0.85rem', color: '#444', fontWeight: 600, marginBottom: 4, display: 'block' };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(''); setSuccess('');
     if (!form.name.trim()) { setError('Name is required'); return; }
     const newEntry = { id: `ta-${Date.now()}`, ...form, name: form.name.trim(), company: form.company.trim() };
-    if (refType === 'agent') {
-      if (agents.some(a => a.name.toLowerCase() === newEntry.name.toLowerCase())) { setError('Agent already exists'); return; }
-      onAgentsChange([...agents, newEntry]);
-    } else {
-      if (thirdParties.some(t => t.name.toLowerCase() === newEntry.name.toLowerCase())) { setError('Third party already exists'); return; }
-      onThirdPartyChange([...thirdParties, newEntry]);
+    try {
+
+  if (refType === 'agent') {
+
+    if (
+      agents.some(
+        a => a.name.toLowerCase() === newEntry.name.toLowerCase()
+      )
+    ) {
+      setError('Agent already exists');
+      return;
     }
+
+    await saveAgent(newEntry);
+
+    const freshAgents = await getAgents();
+
+    onAgentsChange(freshAgents);
+
+  } else {
+
+    if (
+      thirdParties.some(
+        t => t.name.toLowerCase() === newEntry.name.toLowerCase()
+      )
+    ) {
+      setError('Third party already exists');
+      return;
+    }
+
+    await saveThirdParty(newEntry);
+
+    const freshThirdParties = await getThirdParties();
+
+    onThirdPartyChange(freshThirdParties);
+  }
+
+} catch (err) {
+
+  console.error(err);
+  setError('Failed to save');
+
+  return;
+}
     setSuccess(`${refType === 'agent' ? 'Travel Agent' : 'Third Party'} "${form.name}" added!`);
     setForm({ name: '', company: '', email: '', mobile: '', gst: '' });
     setTimeout(() => { setSuccess(''); setTab(refType === 'agent' ? 'agents' : 'third'); }, 1500);
   };
 
-  const handleDelete = (id, type) => {
-    if (!window.confirm('Delete this entry?')) return;
-    if (type === 'agent') onAgentsChange(agents.filter(a => a.id !== id));
-    else onThirdPartyChange(thirdParties.filter(t => t.id !== id));
-  };
+ const handleDelete = async (id, type) => {
+
+  if (!window.confirm('Delete this entry?')) return;
+
+  try {
+
+    if (type === 'agent') {
+
+      await deleteAgent(id);
+
+      const freshAgents = await getAgents();
+
+      onAgentsChange(freshAgents);
+
+    } else {
+
+      await deleteThirdParty(id);
+
+      const freshThirdParties = await getThirdParties();
+
+      onThirdPartyChange(freshThirdParties);
+    }
+
+  } catch (err) {
+
+    console.error(err);
+    alert('Delete failed');
+
+  }
+};
 
   const thStyle = { padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#555', borderBottom: '2px solid #e0e0e0', fontSize: '0.72rem', letterSpacing: '0.05em', background: '#f0f2f5' };
   const tdStyle = { padding: '9px 12px', fontSize: '0.8rem', borderBottom: '1px solid #eee', color: '#1a1a2e' };

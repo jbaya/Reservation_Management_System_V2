@@ -12,6 +12,26 @@ import { sampleBookings, initialRooms, initialThirdParties } from './constants/r
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 import { sortRoomList } from './utils/roomUtils.js';
+import {
+  getCategories,
+  saveCategory,
+  updateCategory,
+  deleteCategory,
+getRooms,
+getAllRoomNumbers,
+saveRoom,
+deleteRoom,
+  updateRoomCategory,
+
+  getAgents,
+  saveAgent,
+  deleteAgent,
+
+  getThirdParties,
+  saveThirdParty,
+  deleteThirdParty
+
+} from './api.js';
 
 // ── Pages ─────────────────────────────────────────────────────────────────────
 import RoomCategoryPage from './pages/RoomCategoryPage.jsx';
@@ -65,8 +85,8 @@ function App() {
   const [travelAgentRates, setTravelAgentRates]  = useState([]);
   const [thirdParties,     setThirdParties]      = useState(initialThirdParties);
   const [bookings,         setBookings]          = useState(sampleBookings);
-  const [rooms,            setRooms]             = useState(() => sortRoomList(initialRooms));
-  const [categoryColors,   setCategoryColors]    = useState(initialCategoryColors);
+ const [rooms, setRooms] = useState([]);
+const [categoryColors, setCategoryColors] = useState({});
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [showCalendar,   setShowCalendar]   = useState(true);
@@ -132,6 +152,45 @@ function App() {
     }, 250);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // App.jsx mein — existing useEffects ke baad ye add karo
+useEffect(() => {
+  getCategories().then(rows => {
+    if (rows && rows.length > 0) {
+      const colors = {};
+      rows.forEach(row => {
+        const hex = row.color || '#1565c0';
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        colors[row.category] = {
+          bg: `rgba(${r}, ${g}, ${b}, 0.18)`,
+          border: hex,
+          num_rooms: row.num_rooms
+        };
+      });
+      setCategoryColors(colors);
+    }
+  }).catch(console.error);
+
+  getRooms().then(data => {
+    if (data && data.length > 0) {
+      setRooms(sortRoomList(data));
+    }
+  }).catch(console.error);
+
+  getAgents()
+  .then(data => {
+    setTravelAgents(data || []);
+  })
+  .catch(console.error);
+
+getThirdParties()
+  .then(data => {
+    setThirdParties(data || []);
+  })
+  .catch(console.error);
+}, []);
 
   // ── Overlap check (single source of truth) ────────────────────────────────
   /**
@@ -357,50 +416,272 @@ function App() {
   }, [handleUpdateBooking]);
 
   // ── Room / Category handlers ──────────────────────────────────────────────
-  const handleAddCategory = useCallback((name, numRooms) => {
-    const color = AUTO_COLORS[Object.keys(categoryColors).length % AUTO_COLORS.length];
-    let newRooms = [];
+ const handleAddCategory = useCallback(async (name, numRooms) => {
+  const color = AUTO_COLORS[Object.keys(categoryColors).length % AUTO_COLORS.length];
+  let newRooms = [];
 
-    if (numRooms && !isNaN(numRooms) && numRooms > 0) {
+  if (numRooms && !isNaN(numRooms) && numRooms > 0) {
+    const allRoomNumbers = await getAllRoomNumbers();
+
+const existingNumbers = allRoomNumbers
+  .map(n => parseInt(n))
+  .filter(n => !isNaN(n));
+
+let startNum =
+  existingNumbers.length > 0
+    ? Math.max(...existingNumbers) + 1
+    : 101;
+
+    for (let i = 0; i < numRooms; i++) {
+      let rn = String(startNum + i);
+      while (rooms.some(r => r.name === rn) || newRooms.some(r => r.name === rn)) {
+        startNum++;
+        rn = String(startNum + i);
+      }
+      newRooms.push({ name: rn, category: name, floor: '1' });
+    }
+  }
+
+  try {
+    // 1. Save category to DB
+    await saveCategory(name, numRooms || 0, color.border);
+    console.log('✅ Category saved:', name);
+
+    // 2. Save each room to DB
+    for (const room of newRooms) {
+      console.log('ROOM GOING TO DB =>', room);
+      await saveRoom(room);
+      console.log('✅ Room saved:', room.name);
+    }
+
+    // 3. Update frontend state only after DB success
+    setCategoryColors(prev => ({ ...prev, [name]: color }));
+    if (newRooms.length > 0) {
+      setRooms(sortRoomList([...rooms, ...newRooms]));
+    }
+
+  } catch (err) {
+    console.error('❌ Save failed:', err);
+    alert('Failed to save! Check console.');
+  }
+
+}, [categoryColors, rooms]);
+
+const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoomCount) => {
+  if (oldName !== newName && categoryColors[newName] !== undefined) {
+    alert('Category already exists');
+    return;
+  }
+
+  const targetCount = parseInt(newRoomCount);
+  if (isNaN(targetCount) || targetCount < 0) {
+    alert('Invalid room count');
+    return;
+  }
+
+  try {
+    // 1. Category DB update
+    const allCats = await getCategories();
+    const catRow = allCats.find(r => r.category === oldName);
+    if (catRow) {
+      await updateCategory(catRow.id, newName, targetCount, newColor);
+      console.log('✅ Category updated');
+    }
+
+    // 2. Rooms table mein category rename
+    if (oldName !== newName) {
+      await updateRoomCategory(oldName, newName);
+      console.log('✅ Rooms renamed');
+    }
+
+    // 3. Current rooms
+    const currentRooms = rooms.filter(r => r.category === oldName || r.category === newName);
+    const currentCount = currentRooms.length;
+
+    // 4. ADD rooms if needed
+    if (targetCount > currentCount) {
       const existingNumbers = rooms.map(r => parseInt(r.name)).filter(n => !isNaN(n));
-      let startNum = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 101;
-
-      for (let i = 0; i < numRooms; i++) {
-        let rn = String(startNum + i);
-        while (rooms.some(r => r.name === rn) || newRooms.some(r => r.name === rn)) {
-          startNum++;
-          rn = String(startNum + i);
-        }
-        newRooms.push({ name: rn, category: name, floor: '1' });
+      let nextNum = (existingNumbers.length > 0 ? Math.max(...existingNumbers) : 100) + 1;
+      for (let i = 0; i < targetCount - currentCount; i++) {
+        while (rooms.some(r => r.name === String(nextNum))) nextNum++;
+        await saveRoom({ name: String(nextNum), category: newName, floor: '1' });
+        console.log('✅ Room added:', nextNum);
+        nextNum++;
       }
     }
 
-    setCategoryColors(prev => ({ ...prev, [name]: color }));
-    if (newRooms.length > 0) setRooms(sortRoomList([...rooms, ...newRooms]));
-  }, [categoryColors, rooms]);
+    // 5. DELETE rooms if needed
+    if (targetCount < currentCount) {
+      const roomsToRemove = currentRooms.slice(targetCount).map(r => r.name);
+      const hasActive = roomsToRemove.some(rn =>
+        bookings.some(b => b.roomName === rn && !['cancelled', 'no-show'].includes(b.status))
+      );
+      if (hasActive) {
+        alert('Cannot reduce — some rooms have active bookings!');
+        return;
+      }
+      for (const rn of roomsToRemove) {
+        await deleteRoom(rn);
+        console.log('✅ Room deleted:', rn);
+      }
+    }
 
-  const handleDeleteCategory = useCallback((name) => {
-    if (rooms.some(r => r.category === name)) {
-      alert(`Cannot delete "${name}" — rooms exist in this category`);
+    // 6. Frontend state update
+    const r = parseInt(newColor.slice(1, 3), 16);
+    const g = parseInt(newColor.slice(3, 5), 16);
+    const b = parseInt(newColor.slice(5, 7), 16);
+
+    setCategoryColors(prev => {
+      const updated = { ...prev };
+      updated[newName] = {
+        bg: `rgba(${r}, ${g}, ${b}, 0.18)`,
+        border: newColor,
+        num_rooms: targetCount,
+      };
+      if (oldName !== newName) delete updated[oldName];
+      return updated;
+    });
+
+    // 7. Fresh rooms DB se load karo
+    const freshRooms = await getRooms();
+    setRooms(sortRoomList(freshRooms));
+
+    alert(`"${newName}" updated successfully`);
+
+  } catch (err) {
+    console.error('❌ Edit failed:', err);
+    alert('Failed to update! Check console.');
+  }
+
+}, [categoryColors, bookings, rooms]);
+
+const handleDeleteCategory = useCallback(async (name) => {
+  try {
+
+    // active booking check
+    const hasActiveBookings = bookings.some(
+      b =>
+        rooms.some(r => r.category === name && r.name === b.roomName) &&
+        !['cancelled', 'no-show'].includes(b.status)
+    );
+
+    if (hasActiveBookings) {
+      alert('Cannot delete category with active bookings');
       return;
     }
-    if (!window.confirm(`Delete category "${name}"?`)) return;
-    setCategoryColors(prev => { const n = { ...prev }; delete n[name]; return n; });
-  }, [rooms]);
 
-  const handleAddRoom = useCallback((room) => {
-    if (rooms.some(r => r.name === room.name)) return;
-    setRooms(sortRoomList([...rooms, { ...room, floor: room.floor || '1' }]));
-  }, [rooms]);
+    // get all categories from DB
+    const allCats = await getCategories();
 
-  const handleDeleteRoom = useCallback((name) => {
-    if (bookings.some(b => b.roomName === name && !['cancelled', 'no-show'].includes(b.status))) {
-      alert('Cannot delete room with active bookings');
+    // find category row
+    const catRow = allCats.find(c => c.category === name);
+
+    if (!catRow) {
+      alert('Category not found');
       return;
     }
-    if (!window.confirm(`Delete room ${name}?`)) return;
-    setRooms(prev => prev.filter(r => r.name !== name));
-  }, [bookings]);
+
+    // delete all rooms of this category from DB
+    const categoryRooms = rooms.filter(r => r.category === name);
+
+    for (const room of categoryRooms) {
+      await deleteRoom(room.name);
+      console.log('✅ Room deleted:', room.name);
+    }
+
+    // delete category from DB
+    await deleteCategory(catRow.id);
+
+    console.log('✅ Category deleted');
+
+    // reload fresh DB data
+    const freshRooms = await getRooms();
+    const freshCategories = await getCategories();
+
+    // rebuild category colors
+    const colors = {};
+
+    freshCategories.forEach(row => {
+      const hex = row.color || '#1565c0';
+
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+
+      colors[row.category] = {
+        bg: `rgba(${r}, ${g}, ${b}, 0.18)`,
+        border: hex,
+        num_rooms: row.num_rooms
+      };
+    });
+
+    setCategoryColors(colors);
+    setRooms(sortRoomList(freshRooms));
+
+    alert(`"${name}" deleted successfully`);
+
+  } catch (err) {
+    console.error('❌ Delete failed:', err);
+    alert('Failed to delete category');
+  }
+}, [bookings, rooms]);
+ const handleAddRoom = useCallback(async (room) => {
+  try {
+
+    await saveRoom({
+      name: room.name,
+      category: room.category,
+      floor: room.floor || '1',
+      capacity: room.capacity || 2
+    });
+
+    const freshRooms = await getRooms();
+
+    setRooms(sortRoomList(freshRooms));
+
+    console.log('✅ Room saved:', room.name);
+
+  } catch (err) {
+    console.error('❌ Save failed:', err);
+    alert('Failed to save room');
+  }
+}, []);
+
+ const handleDeleteRoom = useCallback(async (name) => {
+
+  if (
+    bookings.some(
+      b =>
+        b.roomName === name &&
+        !['cancelled', 'no-show'].includes(b.status)
+    )
+  ) {
+    alert('Cannot delete room with active bookings');
+    return;
+  }
+
+  if (!window.confirm(`Delete room ${name}?`)) return;
+
+  try {
+
+    // delete from DB
+    await deleteRoom(name);
+
+    console.log('✅ Room deleted:', name);
+
+    // reload rooms from DB
+    const freshRooms = await getRooms();
+
+    setRooms(sortRoomList(freshRooms));
+
+    alert(`Room ${name} deleted successfully`);
+
+  } catch (err) {
+    console.error('❌ Delete failed:', err);
+    alert('Failed to delete room');
+  }
+
+}, [bookings]);
 
   // ── Block room ────────────────────────────────────────────────────────────
   const handleBlockSubmit = useCallback((e) => {
@@ -660,17 +941,7 @@ function App() {
                   </div>
                 ))}
 
-                <div style={{ width: 1, height: 18, background: '#e0e0e0', margin: '0 2px' }} />
-
-                {/* Category availability dropdown (read-only summary) */}
-                <select style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.7rem', cursor: 'pointer' }}>
-                  {sortedCategories.map(cat => {
-                    const catRooms = rooms.filter(r => r.category === cat);
-                    const occ = catRooms.filter(r => activeToday.some(b => b.roomName === r.name)).length;
-                    return <option key={cat}>{cat} ({catRooms.length - occ} avail / {catRooms.length} total)</option>;
-                  })}
-                </select>
-
+                
                 <div style={{ width: 1, height: 18, background: '#e0e0e0', margin: '0 2px' }} />
 
                 <select
@@ -693,6 +964,8 @@ function App() {
                   <option value="DNC">DNC</option>
                 </select>
 
+                
+
                 {/* Category colour legend */}
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
                   {Object.entries(categoryColors).map(([cat, c]) => (
@@ -701,7 +974,20 @@ function App() {
                       <span style={{ color: '#666' }}>{cat}</span>
                     </div>
                   ))}
+                   {/* Hint bar */}
+              <div style={{ background: '#f7f8fa', borderBottom: '1px solid #eee', padding: '3px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+               
+                <div style={{ display: 'flex', gap: 10, fontSize: '0.65rem' }}>
+                  {[['Paid', '#27ae60'], ['Partial', '#f39c12'], ['Due', '#e74c3c']].map(([s, c]) => (
+                    <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ width: 7, height: 7, background: c, borderRadius: '50%' }} />
+                      <span style={{ color: '#888' }}>{s}</span>
+                    </div>
+                  ))}
                 </div>
+              </div>
+                </div>
+
               </div>
 
               {/* Dashboard overlay */}
@@ -715,24 +1001,7 @@ function App() {
                 />
               )}
 
-              {/* Hint bar */}
-              <div style={{ background: '#f7f8fa', borderBottom: '1px solid #eee', padding: '3px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <div style={{ display: 'flex', gap: 14, fontSize: '0.67rem', color: '#aaa' }}>
-                  <span>📌 Click cell → Quick book</span>
-                  <span>🖱️ Click bar → Quick edit</span>
-                  <span>↔️ Double-click → Full edit</span>
-                  <span>↔️ Drag right → Extend</span>
-                  <span>🖱️ Right-click → Actions</span>
-                </div>
-                <div style={{ display: 'flex', gap: 10, fontSize: '0.65rem' }}>
-                  {[['Paid', '#27ae60'], ['Partial', '#f39c12'], ['Due', '#e74c3c']].map(([s, c]) => (
-                    <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <div style={{ width: 7, height: 7, background: c, borderRadius: '50%' }} />
-                      <span style={{ color: '#888' }}>{s}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+             
 
               {/* Calendar */}
               <main style={{ flex: 1, padding: '8px 14px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -794,12 +1063,13 @@ function App() {
               </div>
 
               {activePage === 'room-category' && (
-                <RoomCategoryPage
-                  categoryColors={categoryColors}
-                  rooms={rooms}
-                  onAddCategory={handleAddCategory}
-                  onDeleteCategory={handleDeleteCategory}
-                />
+               <RoomCategoryPage
+  categoryColors={categoryColors}
+  rooms={rooms}
+  onAddCategory={handleAddCategory}
+  onDeleteCategory={handleDeleteCategory}
+  onEditCategory={handleEditCategory}
+/>
               )}
 
               {activePage === 'room-no' && (

@@ -328,78 +328,115 @@ function ViewReservationPage({ bookings, rooms, categoryColors, currentUser, tra
       </div>
 
       {/* Table */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-        <thead>
-          <tr style={{ background: '#f0f2f5' }}>
-            {['SR.', 'BOOKING ID', 'GUEST', 'ROOM', 'CATEGORY', 'CHECK-IN', 'CHECK-OUT', 'NIGHTS', 'RATE', 'STATUS', 'PAYMENT', 'AMOUNT', 'ACTION'].map(h => (
-              <th key={h} style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 700, color: '#555', borderBottom: '2px solid #e0e0e0', fontSize: '0.72rem', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.length === 0 ? (
-            <tr><td colSpan={13} style={{ padding: 30, textAlign: 'center', color: '#aaa' }}>No reservations found</td></tr>
-          ) : filtered.map((b, idx) => {
-            const nights = b.arrival && b.departure ? Math.round((new Date(b.departure) - new Date(b.arrival)) / 86400000) : '—';
-            const c = categoryColors[rooms.find(r => r.name === b.roomName)?.category] || { bg: '#f5f5f5', border: '#999' };
-            const hasOverride = b.rooms?.some(r => r.isRateOverridden) || b.isRateOverridden;
-            return (
-              <tr key={b.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f9f9f9', borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '9px 10px', color: '#888' }}>{idx + 1}</td>
-                <td style={{ padding: '9px 10px', fontWeight: 600, color: '#1565c0', fontSize: '0.75rem' }}>{b.bookingId || <span style={{ color: '#ccc' }}>—</span>}</td>
-                <td style={{ padding: '9px 10px', fontWeight: 600, color: '#1a1a2e' }}>
-                  {b.guestName}
-                  {b.tags?.includes('VIP') && <span style={{ marginLeft: 5, fontSize: '0.65rem', background: '#f5eef8', color: '#6c3483', border: '1px solid #ce93d8', borderRadius: 8, padding: '1px 6px' }}>VIP</span>}
-                </td>
-                <td style={{ padding: '9px 10px', fontWeight: 700 }}>{b.roomName || `${b.rooms?.length} rooms`}</td>
-                <td style={{ padding: '9px 10px' }}>
-                  <span style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 8, padding: '2px 8px', fontSize: '0.72rem' }}>
-                    {rooms.find(r => r.name === b.roomName)?.category || (b.isMultiRoom ? 'Multi' : '—')}
-                  </span>
-                </td>
-                <td style={{ padding: '9px 10px', color: '#555' }}>{b.arrival}</td>
-                <td style={{ padding: '9px 10px', color: '#555' }}>{b.departure}</td>
-                <td style={{ padding: '9px 10px', textAlign: 'center', fontWeight: 600 }}>{nights}</td>
+<table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+  <thead>
+    <tr style={{ background: '#f0f2f5' }}>
+      {['SR.', 'BOOKING ID', 'GUEST', 'ROOM', 'CATEGORY', 'CHECK-IN', 'CHECK-OUT', 'NIGHTS', 'RATE', 'STATUS', 'PAYMENT', 'AMOUNT', 'ACTION'].map(h => (
+        <th key={h} style={{ padding: '7px 8px', textAlign: 'left', fontWeight: 700, color: '#555', borderBottom: '2px solid #e0e0e0', fontSize: '0.68rem', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+      ))}
+    </tr>
+  </thead>
+  <tbody>
+    {filtered.length === 0 ? (
+      <tr><td colSpan={13} style={{ padding: 24, textAlign: 'center', color: '#aaa', fontSize: '0.8rem' }}>No reservations found</td></tr>
+    ) : filtered.map((b, idx) => {
+      const nights = b.arrival && b.departure ? Math.round((new Date(b.departure) - new Date(b.arrival)) / 86400000) : '—';
+      const c = categoryColors[rooms.find(r => r.name === b.roomName)?.category] || { bg: '#f5f5f5', border: '#999' };
+      const hasOverride = b.rooms?.some(r => r.isRateOverridden) || b.isRateOverridden;
+      return (
+        <tr key={b.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f9f9f9', borderBottom: '1px solid #eee' }}>
+          <td style={{ padding: '6px 8px', color: '#aaa', fontSize: '0.72rem' }}>{idx + 1}</td>
 
-                {/* Rate column with override badge */}
-                <td style={{ padding: '9px 10px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontWeight: 600 }}>
-                      {b.source === BOOKING_SOURCES.OTA
-                        ? <span style={{ color: '#e67e22', fontSize: '0.72rem' }}>OTA</span>
-                        : b.baseRate ? `₹${b.baseRate}` : b.rooms?.[0]?.rate ? `₹${b.rooms[0].rate}` : '—'}
-                    </span>
-                    {hasOverride && (
-                      <span style={{ fontSize: '0.62rem', background: '#fff3cd', color: '#856404', border: '1px solid #ffc107', borderRadius: 4, padding: '1px 5px', whiteSpace: 'nowrap' }}>✏️ Override</span>
-                    )}
-                    {b.source === 'agent' && !hasOverride && b.agentName && (
-                      <span style={{ fontSize: '0.62rem', color: '#1e8449', fontWeight: 600 }}>✓ Agent rate</span>
-                    )}
-                  </div>
-                </td>
+          <td style={{ padding: '6px 8px', fontWeight: 600, color: '#1565c0', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+            {b.bookingId || <span style={{ color: '#ccc' }}>—</span>}
+          </td>
 
-                <td style={{ padding: '9px 10px' }}>
-                  <span style={{ background: statusColor(b.status) + '22', color: statusColor(b.status), border: `1px solid ${statusColor(b.status)}44`, borderRadius: 10, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700, textTransform: 'capitalize' }}>{b.status}</span>
-                </td>
-                <td style={{ padding: '9px 10px' }}>
-                  <span style={{ color: b.paymentStatus === 'paid' ? '#1e8449' : b.paymentStatus === 'due' ? '#e74c3c' : '#e67e22', fontWeight: 700, fontSize: '0.75rem', textTransform: 'capitalize' }}>{b.paymentStatus}</span>
-                </td>
-                <td style={{ padding: '9px 10px', fontWeight: 700, color: '#1a1a2e' }}>{b.totalAmount ? `₹${Number(b.totalAmount).toLocaleString('en-IN')}` : '—'}</td>
-                <td style={{ padding: '9px 10px' }}>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button style={{ color: '#1565c0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>EDIT</button>
-                    <button
-                      onClick={() => setBillingBooking(b)}
-                      style={{ color: '#fff', background: '#1e8449', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px' }}>
-                      🧾 Bill
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+          <td style={{ padding: '6px 8px', fontWeight: 600, color: '#1a1a2e', whiteSpace: 'nowrap' }}>
+            {b.guestName}
+            {b.tags?.includes('VIP') && (
+              <span style={{ marginLeft: 4, fontSize: '0.6rem', background: '#f5eef8', color: '#6c3483', border: '1px solid #ce93d8', borderRadius: 6, padding: '1px 5px' }}>VIP</span>
+            )}
+          </td>
+
+          <td style={{ padding: '6px 8px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+            {b.roomName || `${b.rooms?.length} rooms`}
+          </td>
+
+          <td style={{ padding: '6px 8px' }}>
+            <span style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 6, padding: '2px 7px', fontSize: '0.68rem', whiteSpace: 'nowrap' }}>
+              {rooms.find(r => r.name === b.roomName)?.category || (b.isMultiRoom ? 'Multi' : '—')}
+            </span>
+          </td>
+
+          <td style={{ padding: '6px 8px', color: '#555', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
+            {b.arrival || '—'}
+          </td>
+          <td style={{ padding: '6px 8px', color: '#555', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
+            {b.departure || '—'}
+          </td>
+
+          <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600 }}>{nights}</td>
+
+          <td style={{ padding: '6px 8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontWeight: 600, fontSize: '0.72rem' }}>
+                {b.source === BOOKING_SOURCES.OTA
+                  ? <span style={{ color: '#e67e22' }}>OTA</span>
+                  : b.baseRate ? `₹${b.baseRate}` : b.rooms?.[0]?.rate ? `₹${b.rooms[0].rate}` : '—'}
+              </span>
+              {hasOverride && (
+                <span style={{ fontSize: '0.58rem', background: '#fff3cd', color: '#856404', border: '1px solid #ffc107', borderRadius: 3, padding: '1px 4px', whiteSpace: 'nowrap' }}>✏️ Override</span>
+              )}
+              {b.source === 'agent' && !hasOverride && b.agentName && (
+                <span style={{ fontSize: '0.58rem', color: '#1e8449', fontWeight: 600 }}>✓ Agent</span>
+              )}
+            </div>
+          </td>
+
+          <td style={{ padding: '6px 8px' }}>
+            <span style={{
+              background: statusColor(b.status) + '22',
+              color: statusColor(b.status),
+              border: `1px solid ${statusColor(b.status)}44`,
+              borderRadius: 8, padding: '2px 8px',
+              fontSize: '0.68rem', fontWeight: 700,
+              textTransform: 'capitalize', whiteSpace: 'nowrap',
+              display: 'inline-block'
+            }}>
+              {b.status}
+            </span>
+          </td>
+
+          <td style={{ padding: '6px 8px' }}>
+            <span style={{
+              color: b.paymentStatus === 'paid' ? '#1e8449' : b.paymentStatus === 'due' ? '#e74c3c' : '#e67e22',
+              fontWeight: 700, fontSize: '0.72rem', textTransform: 'capitalize', whiteSpace: 'nowrap'
+            }}>
+              {b.paymentStatus}
+            </span>
+          </td>
+
+          <td style={{ padding: '6px 8px', fontWeight: 700, color: '#1a1a2e', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
+            {b.totalAmount ? `₹${Number(b.totalAmount).toLocaleString('en-IN')}` : '—'}
+          </td>
+
+          <td style={{ padding: '6px 8px' }}>
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              <button style={{ color: '#1565c0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700, padding: '2px 4px' }}>
+                EDIT
+              </button>
+              <button
+                onClick={() => setBillingBooking(b)}
+                style={{ color: '#fff', background: '#1e8449', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700, padding: '3px 7px', whiteSpace: 'nowrap' }}>
+                🧾 Bill
+              </button>
+            </div>
+          </td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
 
       {/* Footer */}
       <div style={{ marginTop: 12, fontSize: '0.78rem', color: '#888', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

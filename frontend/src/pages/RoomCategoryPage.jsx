@@ -1,13 +1,27 @@
 import { useState } from 'react';
 
-function RoomCategoryPage({ categoryColors, rooms, onAddCategory, onDeleteCategory }) {
+function RoomCategoryPage({ categoryColors, rooms, onAddCategory, onDeleteCategory, onEditCategory }) {
   const [tab, setTab] = useState('list');
   const [catName, setCatName] = useState('');
   const [numRooms, setNumRooms] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+const [editMode, setEditMode] = useState(false);
+const [editingCat, setEditingCat] = useState('');
+const [editCatName, setEditCatName] = useState('');
+const [editNumRooms, setEditNumRooms] = useState('');
+const [editColor, setEditColor] = useState('#1565c0');
 
-  const inp = { padding: '8px 12px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box', outline: 'none' };
+ const inp = { 
+  padding: '2px 10px',
+  height: '38px',
+  borderRadius: 6,
+  border: '1px solid #ddd',
+  fontSize: '0.85rem',
+  width: '70%',
+  boxSizing: 'border-box',
+  outline: 'none'
+};
   const lbl = { display: 'flex', flexDirection: 'column', gap: 5, fontSize: '0.85rem', color: '#444', fontWeight: 600 };
 
   const handleSubmit = (e) => {
@@ -24,20 +38,57 @@ function RoomCategoryPage({ categoryColors, rooms, onAddCategory, onDeleteCatego
     setTimeout(() => { setSuccess(''); setTab('list'); }, 1500);
   };
 
-  const sortedCats = Object.keys(categoryColors).sort(
-    (a, b) => rooms.filter(r => r.category === a).length - rooms.filter(r => r.category === b).length
-  );
+  const handleDelete = (cat) => {
+  const confirmDelete = window.confirm(`Are you sure you want to delete "${cat}"?`);
+
+  if (confirmDelete) {
+    onDeleteCategory(cat);
+  }
+};
+
+const handleEdit = (cat) => {
+  const currentColor = categoryColors[cat];
+
+  setEditingCat(cat);
+  setEditCatName(cat);
+  // num_rooms directly categoryColors se lo
+  setEditNumRooms(currentColor?.num_rooms ?? 0);
+  setEditColor(currentColor?.border || '#1565c0');
+  setEditMode(true);
+};
+
+const handleEditSubmit = () => {
+  if (!editCatName.trim()) {
+    alert('Category name required');
+    return;
+  }
+
+  const oldRooms = rooms.filter(r => r.category === editingCat);
+  const oldCount = oldRooms.length;
+  const newCount = parseInt(editNumRooms);
+
+  onEditCategory(editingCat, editCatName.trim(), editColor, newCount);
+
+  setSuccess(`Category "${editCatName}" updated successfully!`);
+  setEditMode(false);
+
+  setTimeout(() => {
+    setSuccess('');
+  }, 1500);
+};
+
+  const sortedCats = Object.keys(categoryColors);
 
   return (
     <div style={{ padding: 24, maxWidth: 800 }}>
       <h2 style={{ margin: '0 0 20px', fontSize: '1.2rem', color: '#1a1a2e' }}>🏷️ Room Category</h2>
       <div style={{ display: 'flex', borderBottom: '2px solid #e8eaed', marginBottom: 24 }}>
-        {[['list', 'List Of Room Category'], ['add', 'Add Room Category']].map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)} style={{ padding: '10px 20px', border: 'none', cursor: 'pointer', background: tab === key ? '#fff' : '#f7f8fa', fontWeight: tab === key ? 700 : 500, color: tab === key ? '#1565c0' : '#666', fontSize: '0.85rem', borderBottom: tab === key ? '2px solid #1565c0' : '2px solid transparent', marginBottom: -2, borderRadius: '6px 6px 0 0' }}>{label}</button>
-        ))}
+{[['list', 'List Of Room Category'], ['add', 'Add Room Category']].map(([key, label]) => (
+  <button key={key} onClick={() => { setTab(key); setEditMode(false); }} style={{ padding: '10px 20px', border: 'none', cursor: 'pointer', background: tab === key ? '#fff' : '#f7f8fa', fontWeight: tab === key ? 700 : 500, color: tab === key ? '#1565c0' : '#666', fontSize: '0.85rem', borderBottom: tab === key ? '2px solid #1565c0' : '2px solid transparent', marginBottom: -2, borderRadius: '6px 6px 0 0' }}>{label}</button>
+))}
       </div>
 
-      {tab === 'list' && (
+      {tab === 'list' && !editMode && (
         <div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             {['Copy', 'CSV', 'Print'].map(b => (<button key={b} style={{ padding: '5px 14px', border: '1px solid #ddd', borderRadius: 5, background: '#f5f5f5', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, color: '#555' }}>{b}</button>))}
@@ -69,9 +120,33 @@ function RoomCategoryPage({ categoryColors, rooms, onAddCategory, onDeleteCatego
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button style={{ color: '#1565c0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>EDIT</button>
+<button
+  onClick={() => handleEdit(cat)}
+  style={{
+    color: '#1565c0',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '0.82rem',
+    fontWeight: 600
+  }}
+>
+  EDIT
+</button>
                         <span style={{ color: '#ddd' }}>/</span>
-                        <button onClick={() => onDeleteCategory(cat)} style={{ color: '#e74c3c', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>DELETE</button>
+<button
+  onClick={() => handleDelete(cat)}
+  style={{
+    color: '#e74c3c',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '0.82rem',
+    fontWeight: 600
+  }}
+>
+  DELETE
+</button>
                       </div>
                     </td>
                   </tr>
@@ -79,15 +154,133 @@ function RoomCategoryPage({ categoryColors, rooms, onAddCategory, onDeleteCatego
               })}
             </tbody>
           </table>
-          <div style={{ marginTop: 12, fontSize: '0.78rem', color: '#888', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ marginTop: 12, fontSize: '0.78rem', color: '#1a1919', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Showing 1 to {sortedCats.length} of {sortedCats.length} entries</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#f5f5f5', cursor: 'pointer', fontSize: '0.78rem' }}>Previous</button>
-              <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#f5f5f5', cursor: 'pointer', fontSize: '0.78rem' }}>Next</button>
+              <button style={{ padding: '4px 12px', border: '1px solid #181818', borderRadius: 4, background: '#707070', cursor: 'pointer', fontSize: '0.78rem' }}>Previous</button>
+              <button style={{ padding: '4px 12px', border: '1px solid #0e0d0d', borderRadius: 4, background: '#707070', cursor: 'pointer', fontSize: '0.78rem' }}>Next</button>
             </div>
           </div>
         </div>
       )}
+
+      {editMode && (
+  <div style={{ background: '#fff', border: '1px solid #ddd', padding: 24 }}>
+    <h2 style={{ margin: '0 0 10px', color: '#5d789b', fontWeight: 500 }}>
+      Edit Category
+    </h2>
+
+    <button
+      onClick={() => setEditMode(false)}
+      style={{
+        background: '#1abc9c',
+        color: '#fff',
+        border: 'none',
+        padding: '10px 18px',
+        borderRadius: 4,
+        cursor: 'pointer',
+        marginBottom: 20
+      }}
+    >
+      Back
+    </button>
+
+    <div style={{
+      borderTop: '1px solid #ddd',
+      paddingTop: 30,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 20
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <label style={{ width: 180, fontSize: '1.1rem', fontWeight: 700, color: '#5d789b' }}>
+          Room Category: *
+        </label>
+
+        <input
+          value={editCatName}
+          onChange={(e) => setEditCatName(e.target.value)}
+          style={{
+            width: 500,
+            padding: '10px',
+            border: '1px solid #ccc',
+            fontSize: '1rem'
+          }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <label style={{ width: 180, fontSize: '1.1rem', fontWeight: 700, color: '#5d789b' }}>
+          No. Of Rooms:
+        </label>
+
+        <input
+          type="number"
+          value={editNumRooms}
+          onChange={(e) => setEditNumRooms(e.target.value)}
+          style={{
+            width: 150,
+            padding: '10px',
+            border: '1px solid #ccc',
+            fontSize: '1rem'
+          }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <label style={{ width: 180, fontSize: '1.1rem', fontWeight: 700, color: '#5d789b' }}>
+          Color:
+        </label>
+
+        <input
+          type="color"
+          value={editColor}
+          onChange={(e) => setEditColor(e.target.value)}
+          style={{
+            width: 80,
+            height: 45,
+            border: 'none',
+            cursor: 'pointer'
+          }}
+        />
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <button
+          onClick={handleEditSubmit}
+          style={{
+            background: '#1abc9c',
+            color: '#fff',
+            border: 'none',
+            padding: '10px 22px',
+            borderRadius: 4,
+            cursor: 'pointer',
+            marginRight: 10
+          }}
+        >
+          Submit
+        </button>
+
+        <button
+          onClick={() => {
+            setEditCatName(editingCat);
+            setEditMode(false);
+          }}
+          style={{
+            background: '#3498db',
+            color: '#fff',
+            border: 'none',
+            padding: '10px 22px',
+            borderRadius: 4,
+            cursor: 'pointer'
+          }}
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {tab === 'add' && (
         <form onSubmit={handleSubmit} style={{ maxWidth: 500, display: 'flex', flexDirection: 'column', gap: 16 }}>

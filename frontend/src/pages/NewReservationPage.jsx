@@ -398,234 +398,251 @@ function NewReservationPage({
         />
       )}
 
-      {activeTab === 'single' && (
-        <form onSubmit={handleSubmit}>
-          {/* Row 1: Dates + Pax */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
-            <ReservationField label="Check-In Date" required>
-              <input
-                type="date"
-                value={form.arrival}
-                onChange={(e) => {
-                  const selectedDate = e.target.value;
-                  setForm(p => ({ ...p, arrival: selectedDate }));
-                  if (form.source === 'agent') {
-                    // silent = false: user explicitly changed the date, so show alert if no match
-                    autoApplyTravelAgentRate(form.agentName, form.rooms[0].roomCategory, selectedDate, false);
-                  }
-                }}
-                style={inp}
-                required
-              />
-            </ReservationField>
-            <ReservationField label="Check-Out Date" required>
-              <input type="date" value={form.departure} onChange={handleChange('departure')} style={inp} required />
-            </ReservationField>
-            <ReservationField label="No. Of Pax" required>
-              <input type="number" min="1" value={form.numGuests} onChange={handleChange('numGuests')} style={inp} />
-            </ReservationField>
-            <ReservationField label="No. Of Child" required>
-              <input type="number" min="0" value={form.numChildren} onChange={handleChildrenCount} style={inp} />
-            </ReservationField>
-          </div>
+     {activeTab === 'single' && (
+  <form onSubmit={handleSubmit}>
+    {/* Row 1: Dates + Pax */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <ReservationField label="Check-In Date" required>
+        <input
+          type="date"
+          value={form.arrival}
+          onChange={(e) => {
+            const selectedDate = e.target.value;
+            setForm(p => ({ ...p, arrival: selectedDate }));
+            if (form.source === 'agent') {
+              autoApplyTravelAgentRate(form.agentName, form.rooms[0].roomCategory, selectedDate, false);
+            }
+          }}
+          onClick={(e) => e.target.showPicker?.()}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', cursor: 'pointer' }}
+          required
+        />
+      </ReservationField>
+      <ReservationField label="Check-Out Date" required>
+        <input
+          type="date"
+          value={form.departure}
+          onChange={handleChange('departure')}
+          onClick={(e) => e.target.showPicker?.()}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', cursor: 'pointer' }}
+          required
+        />
+      </ReservationField>
+      <ReservationField label="No. Of Pax" required>
+        <input type="number" min="1" value={form.numGuests} onChange={handleChange('numGuests')}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }} />
+      </ReservationField>
+      <ReservationField label="No. Of Child" required>
+        <input type="number" min="0" value={form.numChildren} onChange={handleChildrenCount}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }} />
+      </ReservationField>
+    </div>
 
-          {/* Children ages */}
-          {parseInt(form.numChildren) > 0 && (
-            <div style={{ background: '#fff9f0', border: '1px solid #ffe0b2', borderRadius: 8, padding: '12px 16px', marginBottom: 20 }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#e65100', marginBottom: 10 }}>👶 Children Ages (years)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
-                {(form.childrenAges || []).map((age, idx) => {
-                  const ageNum = parseInt(age);
-                  const above6 = !isNaN(ageNum) && ageNum > 6;
-                  return (
-                    <div key={idx}>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: '0.75rem', color: '#444', fontWeight: 600 }}>Child {idx + 1}</label>
-                      <input
-                        type="number" min="0" max="17" value={age}
-                        onChange={e => handleChildAge(idx, e.target.value)} placeholder="Age"
-                        style={{ ...inp, border: above6 ? '1.5px solid #e67e22' : '1.5px solid #ccc' }}
-                      />
-                      {age !== '' && (
-                        <div style={{ fontSize: '0.65rem', color: above6 ? '#e67e22' : '#27ae60', marginTop: 2, fontWeight: 600 }}>
-                          {above6 ? '💰 Extra charge' : '✅ Free'}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {childrenAbove6 > 0 && (
-                <div style={{ marginTop: 10, background: '#fef5e7', border: '1px solid #f8c471', borderRadius: 6, padding: '6px 10px', fontSize: '0.75rem', color: '#d35400' }}>
-                  ⚠️ {childrenAbove6} child{childrenAbove6 > 1 ? 'ren' : ''} above 6 yrs — add extra charge in billing section below
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Row 2: Room */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto 1fr 1fr', gap: 16, marginBottom: 20, alignItems: 'end' }}>
-            <Field label="Room Category" required>
-              <select
-                value={form.rooms[0].roomCategory}
-                onChange={e => {
-                  const selectedCategory = e.target.value;
-                  setForm(p => ({
-                    ...p,
-                    rooms: [{ ...p.rooms[0], roomCategory: selectedCategory, roomName: '' }],
-                  }));
-                  if (form.source === 'agent') {
-                    autoApplyTravelAgentRate(form.agentName, selectedCategory, form.arrival, false);
-                  }
-                }}
-                style={inp}
-              >
-                <option value="">--Select Room Category--</option>
-                {Object.keys(categoryColors).map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Room No." required>
-              <select
-                value={form.rooms[0].roomName}
-                onChange={e => setForm(p => ({ ...p, rooms: [{ ...p.rooms[0], roomName: e.target.value }] }))}
-                style={inp}
-                required
-              >
-                <option value="">--Select Room--</option>
-                {availableRooms.map(r => (
-                  <option key={r.name} value={r.name}>{r.name}</option>
-                ))}
-              </select>
-            </Field>
-
-            <div>
-              <label style={{ fontSize: '0.8rem', color: '#444', fontWeight: 600, marginBottom: 4, display: 'block' }}>&nbsp;</label>
-              <button
-                type="button"
-                style={{ padding: '7px 16px', border: 'none', borderRadius: 5, background: '#1e8449', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', whiteSpace: 'nowrap' }}
-              >
-                Select Room
-              </button>
-            </div>
-
-            <Field label="Breakfast">
-              <select value={form.mealPlan} onChange={handleChange('mealPlan')} style={inp}>
-                {['EP', 'CP', 'MAP', 'AP'].map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </Field>
-
-            <Field label="Status">
-              <select value={form.status} onChange={handleChange('status')} style={inp}>
-                {['inquiry', 'tentative', 'confirmed', 'checked-in'].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          {/* Row 3: Guest */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
-            <Field label="Guest Name" required>
-              <input value={form.guestName} onChange={handleChange('guestName')} placeholder="Enter Guest name..." style={inp} required />
-            </Field>
-            <Field label="Email">
-              <input type="email" value={form.email} onChange={handleChange('email')} placeholder="Enter email" style={inp} />
-            </Field>
-            <Field label="Phone">
-              <input value={form.phone} onChange={handleChange('phone')} placeholder="+91 XXXXX" style={inp} />
-            </Field>
-            <Field label="Nationality" required>
-              <select value={form.nationality} onChange={handleChange('nationality')} style={inp} required>
-                <option value="">--Select Nationality--</option>
-                <option value="Indian">Indian</option>
-                <option value="Foreigner">Foreigner</option>
-              </select>
-            </Field>
-          </div>
-
-          {/* Row 4: Booking Source */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
-            <Field label="Booking Reference" required>
-              <select value={form.source} onChange={handleChange('source')} style={inp}>
-                {['direct', 'OTA', 'agent', 'walkin', 'corporate'].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </Field>
-
-            {form.source === 'OTA' && <>
-              <Field label="OTA Platform">
-                <select value={form.otaPlatform} onChange={handleChange('otaPlatform')} style={inp}>
-                  <option value="">--Select OTA--</option>
-                  {thirdParties.length > 0
-                    ? thirdParties.map(p => <option key={p.id} value={p.name}>{p.name}</option>)
-                    : OTA_PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)
-                  }
-                </select>
-              </Field>
-              <Field label="Booking ID / Reservation Reference" required>
+    {/* Children ages */}
+    {parseInt(form.numChildren) > 0 && (
+      <div style={{ background: '#fff9f0', border: '1px solid #ffe0b2', borderRadius: 6, padding: '10px 14px', marginBottom: 14 }}>
+        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#e65100', marginBottom: 8 }}>👶 Children Ages (years)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
+          {(form.childrenAges || []).map((age, idx) => {
+            const ageNum = parseInt(age);
+            const above6 = !isNaN(ageNum) && ageNum > 6;
+            return (
+              <div key={idx}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.7rem', color: '#444', fontWeight: 600 }}>Child {idx + 1}</label>
                 <input
-                  value={form.bookingId}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase();
-                    if (/^[A-Z0-9]*$/.test(value)) setForm(p => ({ ...p, bookingId: value }));
-                  }}
-                  placeholder="Enter Booking ID"
-                  style={inp}
-                  required
+                  type="number" min="0" max="17" value={age}
+                  onChange={e => handleChildAge(idx, e.target.value)} placeholder="Age"
+                  style={{ ...inp, padding: '4px 7px', fontSize: '0.75rem', border: above6 ? '1.5px solid #e67e22' : '1.5px solid #ccc' }}
                 />
-              </Field>
-            </>}
-
-            {form.source === 'agent' && (
-              <Field label="Travel Agent" required>
-                <select
-                  value={form.agentName}
-                  onChange={(e) => {
-                    const selectedAgent = e.target.value;
-                    setForm(p => ({ ...p, agentName: selectedAgent }));
-                    // silent = false: user explicitly selected an agent, show alert if no match
-                    autoApplyTravelAgentRate(selectedAgent, form.rooms[0].roomCategory, form.arrival, false);
-                  }}
-                  style={{ ...inp, border: '1.5px solid #1565c0' }}
-                >
-                  <option value="">--Select Travel Agent--</option>
-                  {travelAgents.map(a => (
-                    <option key={a.id} value={a.name}>{a.name}{a.company ? ` (${a.company})` : ''}</option>
-                  ))}
-                </select>
-                {travelAgents.length === 0 && (
-                  <div style={{ fontSize: '0.7rem', color: '#e67e22', marginTop: 4 }}>
-                    ⚠️ No agents added yet — go to Reservation → Travel Agent/Third Party
+                {age !== '' && (
+                  <div style={{ fontSize: '0.62rem', color: above6 ? '#e67e22' : '#27ae60', marginTop: 2, fontWeight: 600 }}>
+                    {above6 ? '💰 Extra charge' : '✅ Free'}
                   </div>
                 )}
-              </Field>
-            )}
-
-            <Field label="Tags">
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 4 }}>
-                {['VIP', 'DND', 'Honeymoon', 'Anniversary', 'Birthday', 'Corporate'].map(tag => (
-                  <button key={tag} type="button"
-                    onClick={() => setForm(p => ({
-                      ...p,
-                      tags: p.tags?.includes(tag)
-                        ? p.tags.filter(t => t !== tag)
-                        : [...(p.tags || []), tag],
-                    }))}
-                    style={{
-                      padding: '3px 10px', borderRadius: 12, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
-                      border: form.tags?.includes(tag) ? '2px solid #1565c0' : '2px solid #ddd',
-                      background: form.tags?.includes(tag) ? '#e3f0ff' : '#f8f9fa',
-                      color: form.tags?.includes(tag) ? '#1565c0' : '#666',
-                    }}>
-                    {tag}
-                  </button>
-                ))}
               </div>
-            </Field>
+            );
+          })}
+        </div>
+        {childrenAbove6 > 0 && (
+          <div style={{ marginTop: 8, background: '#fef5e7', border: '1px solid #f8c471', borderRadius: 5, padding: '5px 9px', fontSize: '0.7rem', color: '#d35400' }}>
+            ⚠️ {childrenAbove6} child{childrenAbove6 > 1 ? 'ren' : ''} above 6 yrs — add extra charge in billing section below
           </div>
+        )}
+      </div>
+    )}
+
+    {/* Row 2: Room */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <Field label="Room Category" required>
+        <select
+          value={form.rooms[0].roomCategory}
+          onChange={e => {
+            const selectedCategory = e.target.value;
+            setForm(p => ({ ...p, rooms: [{ ...p.rooms[0], roomCategory: selectedCategory, roomName: '' }] }));
+            if (form.source === 'agent') {
+              autoApplyTravelAgentRate(form.agentName, selectedCategory, form.arrival, false);
+            }
+          }}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }}
+        >
+          <option value="">--Select Category--</option>
+          {Object.keys(categoryColors).map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Room No." required>
+        <select
+          value={form.rooms[0].roomName}
+          onChange={e => setForm(p => ({ ...p, rooms: [{ ...p.rooms[0], roomName: e.target.value }] }))}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }}
+          required
+        >
+          <option value="">--Select Room--</option>
+          {availableRooms.map(r => (
+            <option key={r.name} value={r.name}>{r.name}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Breakfast">
+        <select value={form.mealPlan} onChange={handleChange('mealPlan')}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }}>
+          {['EP', 'CP', 'MAP', 'AP'].map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </Field>
+
+      <Field label="Status">
+        <select value={form.status} onChange={handleChange('status')}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }}>
+          {['inquiry', 'tentative', 'confirmed', 'checked-in'].map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </Field>
+    </div>
+
+    {/* Row 3: Guest */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <Field label="Guest Name" required>
+        <input value={form.guestName} onChange={handleChange('guestName')} placeholder="Guest name"
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }} required />
+      </Field>
+      <Field label="Email">
+        <input type="email" value={form.email} onChange={handleChange('email')} placeholder="Enter email"
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }} />
+      </Field>
+      <Field label="Phone">
+        <input value={form.phone} onChange={handleChange('phone')} placeholder="+91 XXXXX"
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }} />
+      </Field>
+      <Field label="Nationality" required>
+        <select value={form.nationality} onChange={handleChange('nationality')}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }} required>
+          <option value="">--Select--</option>
+          <option value="Indian">Indian</option>
+          <option value="Foreigner">Foreigner</option>
+        </select>
+      </Field>
+    </div>
+
+    {/* Row 4: Booking Source + Tags */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <Field label="Booking Reference" required>
+        <select value={form.source} onChange={handleChange('source')}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }}>
+          {['direct', 'OTA', 'agent', 'walkin', 'corporate'].map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </Field>
+
+      {form.source === 'OTA' && <>
+        <Field label="OTA Platform">
+          <select value={form.otaPlatform} onChange={handleChange('otaPlatform')}
+            style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }}>
+            <option value="">--Select OTA--</option>
+            {thirdParties.length > 0
+              ? thirdParties.map(p => <option key={p.id} value={p.name}>{p.name}</option>)
+              : OTA_PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)
+            }
+          </select>
+        </Field>
+        <Field label="Booking ID" required>
+          <input
+            value={form.bookingId}
+            onChange={(e) => {
+              const value = e.target.value.toUpperCase();
+              if (/^[A-Z0-9]*$/.test(value)) setForm(p => ({ ...p, bookingId: value }));
+            }}
+            placeholder="Booking ID"
+            style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }}
+            required
+          />
+        </Field>
+      </>}
+
+      {form.source === 'agent' && (
+        <Field label="Travel Agent" required>
+          <select
+            value={form.agentName}
+            onChange={(e) => {
+              const selectedAgent = e.target.value;
+              setForm(p => ({ ...p, agentName: selectedAgent }));
+              autoApplyTravelAgentRate(selectedAgent, form.rooms[0].roomCategory, form.arrival, false);
+            }}
+            style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', border: '1.5px solid #1565c0' }}
+          >
+            <option value="">--Select Agent--</option>
+            {travelAgents.map(a => (
+              <option key={a.id} value={a.name}>{a.name}{a.company ? ` (${a.company})` : ''}</option>
+            ))}
+          </select>
+          {travelAgents.length === 0 && (
+            <div style={{ fontSize: '0.67rem', color: '#e67e22', marginTop: 3 }}>
+              ⚠️ No agents added yet
+            </div>
+          )}
+        </Field>
+      )}
+
+      <Field label="Tags">
+        <div style={{ display: 'flex', gap: 5, paddingTop: 3}}>
+          {['VIP', 'DND', 'Honeymoon', 'Anniversary', 'Birthday', 'Corporate'].map(tag => {
+            const isActive = form.tags?.includes(tag);
+            return (
+              <button key={tag} type="button"
+                onClick={() => setForm(p => ({
+                  ...p,
+                  tags: p.tags?.includes(tag)
+                    ? p.tags.filter(t => t !== tag)
+                    : [...(p.tags || []), tag],
+                }))}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = isActive ? '#cce0ff' : '#e8eaed';
+                  e.currentTarget.style.borderColor = isActive ? '#0d47a1' : '#aaa';
+                  e.currentTarget.style.transform = 'scale(1.06)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = isActive ? '#e3f0ff' : '#f8f9fa';
+                  e.currentTarget.style.borderColor = isActive ? '#1565c0' : '#ddd';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                style={{
+                  padding: '2px 8px', borderRadius: 10, fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer',
+                  border: isActive ? '2px solid #1565c0' : '2px solid #ddd',
+                  background: isActive ? '#e3f0ff' : '#f8f9fa',
+                  color: isActive ? '#1565c0' : '#666',
+                  transition: 'all 0.15s ease',
+                }}>
+                {tag}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+    </div>
 
           {/* DNC Toggle */}
           <div style={{
@@ -676,145 +693,154 @@ function NewReservationPage({
             </Field>
           </div>
 
-          {/* Row 6: Billing */}
-          <div style={{ background: '#f8f9fa', border: '1px solid #e8eaed', borderRadius: 8, padding: '16px 20px', marginBottom: 20 }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#555', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Billing Details</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16 }}>
-              <Field label="Room Charges / Night (₹)" required>
-                <input type="number" value={form.baseRate} onChange={handleChange('baseRate')} style={inp} placeholder="0" />
-              </Field>
-              {childrenAbove6 > 0 && (
-                <Field label={`Extra Child Charge/Night (${childrenAbove6} child >6yr)`}>
-                  <input type="number" value={form.extraChildCharge} onChange={handleChange('extraChildCharge')} style={{ ...inp, border: '1.5px solid #e67e22' }} placeholder="0" />
-                </Field>
-              )}
-              <Field label="GST %">
-                <input value={`${autoGst}% (auto)`} style={{ ...inp, background: '#f0f7ff', fontWeight: 700, color: '#1565c0' }} readOnly />
-              </Field>
-              <Field label="Total Charges (₹)" required>
-                <input value={totalCharges} style={{ ...inp, background: '#f0f7ff', fontWeight: 700, color: '#1565c0' }} readOnly />
-              </Field>
-              <Field label="Discounts">
-                <input type="number" value={form.discount} onChange={handleChange('discount')} style={inp} placeholder="0" />
-              </Field>
-              <Field label="Net Amount (₹)" required>
-                <input value={netAmount} style={{ ...inp, background: '#f0fff4', fontWeight: 700, color: '#1e8449' }} readOnly />
-              </Field>
-              <Field label="Advance Payment (₹)">
-                <input type="number" value={form.advanceParticulars} onChange={handleChange('advanceParticulars')} style={inp} placeholder="0" />
-              </Field>
-              <Field label="Advance Payment Type" required={parseFloat(form.advanceParticulars || 0) > 0}>
-                <select value={form.advancePaymentType} onChange={handleChange('advancePaymentType')} style={inp}>
-                  {['None', 'Cash', 'Card', 'UPI', 'Bank Transfer', 'Cheque'].map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16 }}>
-              <Field label="Balance Due (₹)">
-                <input
-                  value={duePayment}
-                  style={{
-                    ...inp, fontWeight: 800, fontSize: '1rem',
-                    background: parseFloat(duePayment) > 0 ? '#fff5f5' : '#f0fff4',
-                    color: parseFloat(duePayment) > 0 ? '#e74c3c' : '#27ae60',
-                  }}
-                  readOnly
-                />
-              </Field>
-              {nights > 0 && (
-                <div style={{ gridColumn: '2/-1', display: 'flex', alignItems: 'center' }}>
-                  <div style={{ background: '#e3f0ff', border: '1px solid #90caf9', borderRadius: 6, padding: '8px 14px', fontSize: '0.78rem', color: '#1565c0', fontWeight: 600 }}>
-                    📅 {nights} night{nights > 1 ? 's' : ''} &nbsp;|&nbsp; Base: ₹{baseTotal.toFixed(0)}
-                    {extraChild > 0 && <> &nbsp;|&nbsp; Children: ₹{extraChild.toFixed(0)}</>}
-                    {extraBedAmt > 0 && <> &nbsp;|&nbsp; Extra Bed: ₹{extraBedAmt.toFixed(0)}</>}
-                    &nbsp;|&nbsp; GST ({autoGst}%): ₹{gstAmt.toFixed(0)}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+         {/* Row 6: Billing */}
+<div style={{ background: '#f8f9fa', border: '1px solid #e8eaed', borderRadius: 7, padding: '12px 16px', marginBottom: 14 }}>
+  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#555', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Billing Details</div>
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+    <Field label="Room Charges / Night (₹)" required>
+      <input type="number" value={form.baseRate} onChange={handleChange('baseRate')}
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }} placeholder="0" />
+    </Field>
+    {childrenAbove6 > 0 && (
+      <Field label={`Extra Child/Night (${childrenAbove6} >6yr)`}>
+        <input type="number" value={form.extraChildCharge} onChange={handleChange('extraChildCharge')}
+          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', border: '1.5px solid #e67e22' }} placeholder="0" />
+      </Field>
+    )}
+    <Field label="GST %">
+      <input value={`${autoGst}% (auto)`}
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', background: '#f0f7ff', fontWeight: 700, color: '#1565c0' }} readOnly />
+    </Field>
+    <Field label="Total Charges (₹)">
+      <input value={totalCharges}
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', background: '#f0f7ff', fontWeight: 700, color: '#1565c0' }} readOnly />
+    </Field>
+    <Field label="Discount (₹)">
+      <input type="number" value={form.discount} onChange={handleChange('discount')}
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }} placeholder="0" />
+    </Field>
+    <Field label="Net Amount (₹)">
+      <input value={netAmount}
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', background: '#f0fff4', fontWeight: 700, color: '#1e8449' }} readOnly />
+    </Field>
+    <Field label="Advance Payment (₹)">
+      <input type="number" value={form.advanceParticulars} onChange={handleChange('advanceParticulars')}
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }} placeholder="0" />
+    </Field>
+    <Field label="Advance Payment Type" required={parseFloat(form.advanceParticulars || 0) > 0}>
+      <select value={form.advancePaymentType} onChange={handleChange('advancePaymentType')}
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem' }}>
+        {['None', 'Cash', 'Card', 'UPI', 'Bank Transfer', 'Cheque'].map(m => (
+          <option key={m} value={m}>{m}</option>
+        ))}
+      </select>
+    </Field>
+  </div>
 
-          {/* Row 7: Payment Mode */}
-          <div style={{ background: '#fff8f1', border: '1px solid #ffe4cc', borderRadius: 8, padding: '16px 20px', marginBottom: 20 }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#d35400', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.05em' }}>💳 Payment Mode</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <Field label="Payment Mode" required={isPaymentModeMandatory}>
-                <select
-                  value={form.paymentMode}
-                  onChange={handleChange('paymentMode')}
-                  style={{ ...inp, border: isPaymentModeMandatory && !form.paymentMode ? '1.5px solid #e74c3c' : '1px solid #ccc' }}
-                >
-                  <option value="">--Select Payment Mode--</option>
-                  {['Cash', 'UPI', 'Card', 'Bank Transfer'].map(mode => (
-                    <option key={mode} value={mode}>{mode}</option>
-                  ))}
-                </select>
-              </Field>
-              {isPaymentModeMandatory && (
-                <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 10 }}>
-                  <div style={{ background: '#fef5e7', border: '1px solid #f8c471', borderRadius: 6, padding: '8px 12px', fontSize: '0.75rem', color: '#d35400', fontWeight: 600 }}>
-                    ⚠️ Payment mode is mandatory for {form.source === 'direct' ? 'Direct' : form.source === 'agent' ? 'Travel Agent' : 'this booking'} bookings
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+  <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, alignItems: 'center' }}>
+    <Field label="Balance Due (₹)">
+      <input
+        value={duePayment}
+        style={{
+          ...inp, padding: '5px 8px', fontWeight: 800, fontSize: '0.88rem',
+          background: parseFloat(duePayment) > 0 ? '#fff5f5' : '#f0fff4',
+          color: parseFloat(duePayment) > 0 ? '#e74c3c' : '#27ae60',
+        }}
+        readOnly
+      />
+    </Field>
+    {nights > 0 && (
+      <div style={{ background: '#e3f0ff', border: '1px solid #90caf9', borderRadius: 5, padding: '6px 12px', fontSize: '0.72rem', color: '#1565c0', fontWeight: 600, marginTop: 18 }}>
+        📅 {nights} night{nights > 1 ? 's' : ''} &nbsp;|&nbsp; Base: ₹{baseTotal.toFixed(0)}
+        {extraChild > 0 && <> &nbsp;|&nbsp; Children: ₹{extraChild.toFixed(0)}</>}
+        {extraBedAmt > 0 && <> &nbsp;|&nbsp; Extra Bed: ₹{extraBedAmt.toFixed(0)}</>}
+        &nbsp;|&nbsp; GST ({autoGst}%): ₹{gstAmt.toFixed(0)}
+      </div>
+    )}
+  </div>
+</div>
 
-          {/* Row 8: Comments */}
-          <div style={{ background: '#f8f9fa', border: '1px solid #e8eaed', borderRadius: 8, padding: '16px 20px', marginBottom: 20 }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#555', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📝 Comments / Special Notes</div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Enter guest request, internal note, or booking remarks"
-                maxLength={500}
-                style={{ flex: 1, minHeight: 80, resize: 'vertical', padding: 10, borderRadius: 6, border: '1px solid #ccc', fontSize: '0.82rem', fontFamily: 'inherit' }}
-              />
-              <button
-                type="button"
-                onClick={addOrUpdateComment}
-                style={{ padding: '10px 18px', border: 'none', borderRadius: 6, background: '#1565c0', color: '#fff', cursor: 'pointer', fontWeight: 700, alignSelf: 'flex-start' }}
-              >
-                {editingCommentId ? 'Update' : 'Add Comment'}
-              </button>
-            </div>
-            <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 12 }}>{newComment.length}/500 characters</div>
-            {(form.comments || []).length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 250, overflowY: 'auto' }}>
-                {[...(form.comments || [])].slice().reverse().map(comment => (
-                  <div key={comment.id} style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 6, padding: 10 }}>
-                    <div style={{ fontSize: '0.68rem', color: '#888', marginBottom: 6, fontWeight: 600 }}>
-                      {new Date(comment.editedAt || comment.createdAt).toLocaleString()}
-                      {comment.editedAt && ' (edited)'}
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: '#333', marginBottom: 8, whiteSpace: 'pre-wrap' }}>{comment.text}</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" onClick={() => editComment(comment)} style={{ border: 'none', background: '#f1f8ff', color: '#1565c0', padding: '4px 10px', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600 }}>Edit</button>
-                      <button type="button" onClick={() => deleteComment(comment.id)} style={{ border: 'none', background: '#fff5f5', color: '#e74c3c', padding: '4px 10px', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600 }}>Delete</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+{/* Row 7: Payment Mode */}
+<div style={{ background: '#fff8f1', border: '1px solid #ffe4cc', borderRadius: 7, padding: '12px 16px', marginBottom: 14 }}>
+  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#d35400', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>💳 Payment Mode</div>
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, alignItems: 'end' }}>
+    <Field label="Payment Mode" required={isPaymentModeMandatory}>
+      <select
+        value={form.paymentMode}
+        onChange={handleChange('paymentMode')}
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', border: isPaymentModeMandatory && !form.paymentMode ? '1.5px solid #e74c3c' : '1px solid #ccc' }}
+      >
+        <option value="">--Select--</option>
+        {['Cash', 'UPI', 'Card', 'Bank Transfer'].map(mode => (
+          <option key={mode} value={mode}>{mode}</option>
+        ))}
+      </select>
+    </Field>
+    {isPaymentModeMandatory && (
+      <div style={{ background: '#fef5e7', border: '1px solid #f8c471', borderRadius: 5, padding: '6px 10px', fontSize: '0.7rem', color: '#d35400', fontWeight: 600, marginBottom: 2 }}>
+        ⚠️ Mandatory for {form.source === 'direct' ? 'Direct' : form.source === 'agent' ? 'Travel Agent' : 'this'} bookings
+      </div>
+    )}
+  </div>
+</div>
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button type="submit" style={{ padding: '10px 32px', border: 'none', borderRadius: 6, background: '#1e8449', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>Submit</button>
-            <button
-              type="reset"
-              onClick={() => setForm(p => ({
-                ...p,
-                guestName: '', phone: '', email: '', arrival: '', departure: '',
-                roomName: '', roomCategory: '', agentName: '', otaPlatform: '', bookingId: '', paymentMode: '',
-              }))}
-              style={{ padding: '10px 32px', border: '1px solid #ddd', borderRadius: 6, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', color: '#555' }}
-            >
-              Reset
-            </button>
+{/* Row 8: Comments */}
+<div style={{ background: '#f8f9fa', border: '1px solid #e8eaed', borderRadius: 7, padding: '12px 16px', marginBottom: 14 }}>
+  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#555', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📝 Comments / Special Notes</div>
+  <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+    <textarea
+      value={newComment}
+      onChange={(e) => setNewComment(e.target.value)}
+      placeholder="Guest request, internal note, or booking remarks"
+      maxLength={500}
+      style={{ flex: 1, minHeight: 60, resize: 'vertical', padding: '6px 8px', borderRadius: 5, border: '1px solid #ccc', fontSize: '0.78rem', fontFamily: 'inherit' }}
+    />
+    <button
+      type="button"
+      onClick={addOrUpdateComment}
+      style={{ padding: '7px 14px', border: 'none', borderRadius: 5, background: '#1565c0', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', alignSelf: 'flex-start' }}
+    >
+      {editingCommentId ? 'Update' : 'Add'}
+    </button>
+  </div>
+  <div style={{ fontSize: '0.68rem', color: '#aaa', marginBottom: 8 }}>{newComment.length}/500</div>
+  {(form.comments || []).length > 0 && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 200, overflowY: 'auto' }}>
+      {[...(form.comments || [])].slice().reverse().map(comment => (
+        <div key={comment.id} style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 5, padding: '7px 10px' }}>
+          <div style={{ fontSize: '0.65rem', color: '#aaa', marginBottom: 4, fontWeight: 600 }}>
+            {new Date(comment.editedAt || comment.createdAt).toLocaleString()}
+            {comment.editedAt && ' (edited)'}
           </div>
+          <div style={{ fontSize: '0.75rem', color: '#333', marginBottom: 6, whiteSpace: 'pre-wrap' }}>{comment.text}</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" onClick={() => editComment(comment)}
+              style={{ border: 'none', background: '#f1f8ff', color: '#1565c0', padding: '3px 8px', borderRadius: 4, cursor: 'pointer', fontSize: '0.68rem', fontWeight: 600 }}>Edit</button>
+            <button type="button" onClick={() => deleteComment(comment.id)}
+              style={{ border: 'none', background: '#fff5f5', color: '#e74c3c', padding: '3px 8px', borderRadius: 4, cursor: 'pointer', fontSize: '0.68rem', fontWeight: 600 }}>Delete</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
+{/* Submit / Reset */}
+<div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+  <button type="submit"
+    style={{ padding: '8px 28px', border: 'none', borderRadius: 5, background: '#1e8449', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
+    Submit
+  </button>
+  <button type="reset"
+    onClick={() => setForm(p => ({
+      ...p,
+      guestName: '', phone: '', email: '', arrival: '', departure: '',
+      roomName: '', roomCategory: '', agentName: '', otaPlatform: '', bookingId: '', paymentMode: '',
+    }))}
+    style={{ padding: '8px 28px', border: '1px solid #ddd', borderRadius: 5, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem', color: '#555' }}>
+    Reset
+  </button>
+</div>
         </form>
       )}
     </div>
