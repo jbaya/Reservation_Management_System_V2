@@ -76,3 +76,55 @@ export const deleteThirdParty = (id) =>
   fetch(`${BASE}/third-parties/${id}`, {
     method: 'DELETE'
   }).then(r => r.json());
+
+  // Seasons
+export const getSeasons = () =>
+  fetch(`${BASE}/seasons`)
+    .then(r => r.json());
+
+export const saveSeason = (season) =>
+  fetch(`${BASE}/seasons`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(season)
+  }).then(r => r.json());
+
+export const updateSeason = (id, season) =>
+  fetch(`${BASE}/seasons/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(season)
+  }).then(r => r.json());
+
+export const deleteSeason = (id) =>
+  fetch(`${BASE}/seasons/${id}`, {
+    method: 'DELETE'
+  }).then(r => r.json());
+
+  // Travel Agent Rates
+
+export const getRates = () =>
+  fetch(`${BASE}/rates`).then(r => r.json());
+
+export const saveRate = (rate) =>
+  fetch(`${BASE}/rates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(rate)
+  }).then(r => r.json());
+
+export const updateRate = (id, rate) =>
+  fetch(`${BASE}/rates/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(rate)
+  }).then(r => r.json());
+
+export const deleteRate = (id) =>
+  fetch(`${BASE}/rates/${id}`, {
+    method: 'DELETE'
+  }).then(r => r.json());

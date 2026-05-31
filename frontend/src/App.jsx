@@ -29,7 +29,14 @@ deleteRoom,
 
   getThirdParties,
   saveThirdParty,
-  deleteThirdParty
+  deleteThirdParty,
+
+  getSeasons,
+saveSeason,
+updateSeason,
+deleteSeason,
+
+getRates
 
 } from './api.js';
 
@@ -188,6 +195,18 @@ useEffect(() => {
 getThirdParties()
   .then(data => {
     setThirdParties(data || []);
+  })
+  .catch(console.error);
+
+  getSeasons()
+  .then(data => {
+    setSeasons(data || []);
+  })
+  .catch(console.error);
+
+  getRates()
+  .then(data => {
+    setTravelAgentRates(data || []);
   })
   .catch(console.error);
 }, []);

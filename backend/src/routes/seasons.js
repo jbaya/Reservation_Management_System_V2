@@ -5,13 +5,28 @@ const router = express.Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { rows } = await db.query('SELECT * FROM seasons ORDER BY from_date');
+    const { rows } = await db.query(
+      'SELECT * FROM seasons ORDER BY from_date'
+    );
+
     const seasons = rows.map(r => ({
-      id: r.id, name: r.name,
-      fromDate: r.from_date, toDate: r.to_date
+      id: r.id,
+      name: r.name,
+
+      fromDate: r.from_date
+        ? `${r.from_date.getFullYear()}-${String(r.from_date.getMonth() + 1).padStart(2,'0')}-${String(r.from_date.getDate()).padStart(2,'0')}`
+        : '',
+
+      toDate: r.to_date
+        ? `${r.to_date.getFullYear()}-${String(r.to_date.getMonth() + 1).padStart(2,'0')}-${String(r.to_date.getDate()).padStart(2,'0')}`
+        : ''
     }));
+
     res.json(seasons);
-  } catch (error) { next(error); }
+
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post('/', async (req, res, next) => {

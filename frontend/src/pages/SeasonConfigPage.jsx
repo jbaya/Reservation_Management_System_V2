@@ -1,5 +1,11 @@
 import { useState } from 'react';
 
+import {
+  saveSeason,
+  updateSeason,
+  deleteSeason
+} from '../api';
+
 function SeasonConfigPage({
   seasons = [],
   onSeasonsChange
@@ -30,66 +36,66 @@ function SeasonConfigPage({
     );
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+  const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (
-      !form.name ||
-      !form.fromDate ||
-      !form.toDate
-    ) {
-      setError('All fields are required');
-      return;
-    }
+  setError('');
+  setSuccess('');
 
-    if (
-      new Date(form.fromDate) >
-      new Date(form.toDate)
-    ) {
-      setError('From date cannot be after To date');
-      return;
-    }
+  if (!form.name || !form.fromDate || !form.toDate) {
+    setError('All fields are required');
+    return;
+  }
 
-    const overlap = seasons.some((s) => {
-      if (editingId && s.id === editingId) return false;
+  if (new Date(form.fromDate) > new Date(form.toDate)) {
+    setError('From date cannot be after To date');
+    return;
+  }
 
-      return datesOverlap(
-        form.fromDate,
-        form.toDate,
-        s.fromDate,
-        s.toDate
-      );
-    });
+  const overlap = seasons.some((s) => {
+    if (editingId && s.id === editingId) return false;
 
-    if (overlap) {
-      setError(
-        'Season dates overlap with existing season'
-      );
-      return;
-    }
+    return datesOverlap(
+      form.fromDate,
+      form.toDate,
+      s.fromDate,
+      s.toDate
+    );
+  });
+
+  if (overlap) {
+    setError('Season dates overlap with existing season');
+    return;
+  }
+
+  try {
 
     if (editingId) {
+
+      await updateSeason(editingId, form);
+
       onSeasonsChange(
         seasons.map((s) =>
           s.id === editingId
-            ? {
-                ...s,
-                ...form
-              }
+            ? { ...s, ...form }
             : s
         )
       );
 
       setSuccess('Season updated');
+
     } else {
+
+      const season = {
+        id: `season-${Date.now()}`,
+        ...form
+      };
+
+      await saveSeason(season);
+
       onSeasonsChange([
         ...seasons,
-        {
-          id: `season-${Date.now()}`,
-          ...form
-        }
+        season
       ]);
 
       setSuccess('Season added');
@@ -102,32 +108,49 @@ function SeasonConfigPage({
     });
 
     setEditingId(null);
-  };
 
-  const handleEdit = (season) => {
-    setForm({
-      name: season.name,
-      fromDate: season.fromDate,
-      toDate: season.toDate
-    });
+  } catch (err) {
 
-    setEditingId(season.id);
-    setError('');
-    setSuccess('');
-  };
+    console.error(err);
 
-  const handleDelete = (id) => {
-    if (
-      !window.confirm(
-        'Delete this season?'
-      )
-    )
-      return;
+    setError('Failed to save season');
+  }
+};
+
+ const handleEdit = (season) => {
+  setForm({
+    name: season.name,
+    fromDate: season.fromDate,
+    toDate: season.toDate
+  });
+
+  setEditingId(season.id);
+  setError('');
+  setSuccess('');
+};
+
+  const handleDelete = async (id) => {
+
+  if (!window.confirm('Delete this season?'))
+    return;
+
+  try {
+
+    await deleteSeason(id);
 
     onSeasonsChange(
       seasons.filter((s) => s.id !== id)
     );
-  };
+
+    setSuccess('Season deleted');
+
+  } catch (err) {
+
+    console.error(err);
+
+    setError('Failed to delete season');
+  }
+};
 
   return (
     <div
@@ -239,68 +262,116 @@ function SeasonConfigPage({
       </form>
 
       <table
+  style={{
+    width: '100%',
+    borderCollapse: 'collapse',
+    marginTop: 20
+  }}
+>
+  <thead>
+    <tr
+      style={{
+        background: '#f5f7fa'
+      }}
+    >
+      <th style={{ padding: '14px', textAlign: 'left' }}>
+        Season
+      </th>
+
+      <th style={{ padding: '14px', textAlign: 'left' }}>
+        From
+      </th>
+
+      <th style={{ padding: '14px', textAlign: 'left' }}>
+        To
+      </th>
+
+      <th style={{ padding: '14px', textAlign: 'left' }}>
+        Action
+      </th>
+    </tr>
+  </thead>
+
+  <tbody>
+  {seasons.map((s) => (
+    <tr
+      key={s.id}
+      style={{
+        borderBottom: '1px solid #e5e7eb',
+        transition: '0.2s'
+      }}
+    >
+      <td
         style={{
-          width: '100%',
-          borderCollapse: 'collapse'
+          padding: '14px',
+          textAlign: 'left',
+          fontWeight: 500
         }}
       >
-        <thead>
-          <tr
-            style={{
-              background: '#f5f7fa'
-            }}
-          >
-            <th style={{ padding: 10 }}>
-              Season
-            </th>
-            <th style={{ padding: 10 }}>
-              From
-            </th>
-            <th style={{ padding: 10 }}>
-              To
-            </th>
-            <th style={{ padding: 10 }}>
-              Action
-            </th>
-          </tr>
-        </thead>
+        {s.name}
+      </td>
 
-        <tbody>
-          {seasons.map((s) => (
-            <tr key={s.id}>
-              <td style={{ padding: 10 }}>
-                {s.name}
-              </td>
-              <td style={{ padding: 10 }}>
-                {s.fromDate}
-              </td>
-              <td style={{ padding: 10 }}>
-                {s.toDate}
-              </td>
-              <td style={{ padding: 10 }}>
-                <button
-                  onClick={() =>
-                    handleEdit(s)
-                  }
-                  style={{
-                    marginRight: 8
-                  }}
-                >
-                  Edit
-                </button>
+      <td
+        style={{
+          padding: '14px',
+          textAlign: 'left'
+        }}
+      >
+        {s.fromDate}
+      </td>
 
-                <button
-                  onClick={() =>
-                    handleDelete(s.id)
-                  }
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <td
+        style={{
+          padding: '14px',
+          textAlign: 'left'
+        }}
+      >
+        {s.toDate}
+      </td>
+
+      <td
+        style={{
+          padding: '14px',
+          textAlign: 'left'
+        }}
+      >
+        <button
+          onClick={() => handleEdit(s)}
+          style={{
+            minWidth: '70px',
+            height: '34px',
+            marginRight: '8px',
+            border: 'none',
+            borderRadius: '4px',
+            background: '#6c757d',
+            color: '#fff',
+            cursor: 'pointer',
+            fontWeight: 500
+          }}
+        >
+          Edit
+        </button>
+
+        <button
+          onClick={() => handleDelete(s.id)}
+          style={{
+            minWidth: '70px',
+            height: '34px',
+            border: 'none',
+            borderRadius: '4px',
+            background: '#dc3545',
+            color: '#fff',
+            cursor: 'pointer',
+            fontWeight: 500
+          }}
+        >
+          Delete
+        </button>
+      </td>
+    </tr>
+  ))}
+</tbody>
+</table>
     </div>
   );
 }

@@ -1,4 +1,10 @@
 import { useState } from 'react';
+import {
+  saveRate,
+  updateRate,
+  deleteRate,
+  getRates
+} from '../api.js';
 
 function TravelAgentRateConfig({
   agents = [],
@@ -28,63 +34,71 @@ function TravelAgentRateConfig({
     boxSizing: 'border-box'
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+  const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (
-      !form.agentName ||
-      !form.roomCategory ||
-      !form.seasonId ||
-      !form.roomRate
-    ) {
-      setError('Please fill all required fields');
-      return;
-    }
+  setError('');
+  setSuccess('');
 
-    const selectedSeason = seasons.find(
-      s => s.id === form.seasonId
+  if (
+    !form.agentName ||
+    !form.roomCategory ||
+    !form.seasonId ||
+    !form.roomRate
+  ) {
+    setError('Please fill all required fields');
+    return;
+  }
+
+  const selectedSeason = seasons.find(
+    s => s.id === form.seasonId
+  );
+
+  const duplicate = travelAgentRates.some(rate => {
+    if (editingId && rate.id === editingId) return false;
+
+    return (
+      rate.agentName === form.agentName &&
+      rate.roomCategory === form.roomCategory &&
+      rate.seasonId === form.seasonId
     );
+  });
 
-    const duplicate = travelAgentRates.some(rate => {
-      if (editingId && rate.id === editingId) return false;
+  if (duplicate) {
+    setError(
+      'Rate already exists for this travel agent, category and season'
+    );
+    return;
+  }
 
-      return (
-        rate.agentName === form.agentName &&
-        rate.roomCategory === form.roomCategory &&
-        rate.seasonId === form.seasonId
-      );
-    });
+  const payload = {
+    id: editingId || `rate-${Date.now()}`,
+    agentName: form.agentName,
+    roomCategory: form.roomCategory,
+    seasonId: form.seasonId,
+    seasonName: selectedSeason?.name || '',
+    roomRate: Number(form.roomRate),
+    extraPersonRate: Number(form.extraPersonRate || 0)
+  };
 
-    if (duplicate) {
-      setError(
-        'Rate already exists for this travel agent, category and season'
-      );
-      return;
-    }
-
-    const payload = {
-      id: editingId || `rate-${Date.now()}`,
-      agentName: form.agentName,
-      roomCategory: form.roomCategory,
-      seasonId: form.seasonId,
-      seasonName: selectedSeason?.name || '',
-      roomRate: Number(form.roomRate),
-      extraPersonRate: Number(form.extraPersonRate || 0)
-    };
+  try {
 
     if (editingId) {
-      onRatesChange(
-        travelAgentRates.map(rate =>
-          rate.id === editingId ? payload : rate
-        )
-      );
+
+      await updateRate(editingId, payload);
+
       setSuccess('Rate updated successfully');
+
     } else {
-      onRatesChange([...travelAgentRates, payload]);
+
+      await saveRate(payload);
+
       setSuccess('Rate added successfully');
     }
+
+    const freshRates = await getRates();
+
+    onRatesChange(freshRates);
 
     setForm({
       agentName: '',
@@ -95,7 +109,14 @@ function TravelAgentRateConfig({
     });
 
     setEditingId(null);
-  };
+
+  } catch (err) {
+
+    console.error(err);
+
+    setError('Failed to save rate');
+  }
+};
 
   const handleEdit = (rate) => {
     setForm({
@@ -111,13 +132,25 @@ function TravelAgentRateConfig({
     setSuccess('');
   };
 
-  const handleDelete = (id) => {
-    if (!window.confirm('Delete this rate?')) return;
+  const handleDelete = async (id) => {
 
-    onRatesChange(
-      travelAgentRates.filter(rate => rate.id !== id)
-    );
-  };
+  if (!window.confirm('Delete this rate?')) return;
+
+  try {
+
+    await deleteRate(id);
+
+    const freshRates = await getRates();
+
+    onRatesChange(freshRates);
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert('Delete failed');
+  }
+};
 
   return (
     <div style={{ padding: 24 }}>
