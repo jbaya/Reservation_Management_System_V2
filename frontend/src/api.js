@@ -1,27 +1,32 @@
-const BASE = 'http://localhost:3001/api';
+const BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
 
 export const getCategories = () =>
   fetch(`${BASE}/categories`).then(r => r.json());
 
-export const saveCategory = (category, num_rooms, color) =>
+export const saveCategory = (category, num_rooms, color, floor = '1') =>
   fetch(`${BASE}/categories`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ category, num_rooms, color })
+    body: JSON.stringify({ category, num_rooms, color, floor })
   }).then(r => r.json());
 
-export const updateCategory = (id, category, num_rooms, color) =>
+  export const updateCategory = (id, category, num_rooms, color, floor = '1') =>
   fetch(`${BASE}/categories/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ category, num_rooms, color })
+    body: JSON.stringify({ category, num_rooms, color, floor })
   }).then(r => r.json());
+
+
 
 export const deleteCategory = (id) =>
   fetch(`${BASE}/categories/${id}`, { method: 'DELETE' }).then(r => r.json());
 
 export const getRooms = () =>
   fetch(`${BASE}/rooms`).then(r => r.json());
+
+export const getBookings = () =>
+  fetch(`${BASE}/bookings`).then(r => r.json());
 
 export const getAllRoomNumbers = () =>
   fetch(`${BASE}/rooms/all-room-numbers`)
@@ -37,17 +42,51 @@ export const saveRoom = (room) =>
 export const deleteRoom = (name) =>
   fetch(`${BASE}/rooms/${name}`, { method: 'DELETE' }).then(r => r.json());
 
+export const updateRoom = async (roomNo, room) => {
+
+  const res = await fetch(
+    `${BASE}/rooms/${roomNo}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(room)
+    }
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(
+      data.error || 'Failed to update room'
+    );
+  }
+
+  return data;
+};
+
 // ← NEW - rooms category rename karne ke liye
-export const updateRoomCategory = (oldCategory, newCategory) =>
+// Replace existing updateRoomCategory
+export const updateRoomCategory = (oldCategory, newCategory, floor) =>
   fetch(`${BASE}/rooms/rename-category`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ oldCategory, newCategory })
+    body: JSON.stringify({ oldCategory, newCategory, floor })
   }).then(r => r.json());
 
   // Travel Agents
 export const getAgents = () =>
   fetch(`${BASE}/agents`).then(r => r.json());
+
+export const updateAgent = (id, agent) =>
+  fetch(`${BASE}/agents/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(agent)
+  }).then(r => r.json());
 
 export const saveAgent = (agent) =>
   fetch(`${BASE}/agents`, {
@@ -64,6 +103,15 @@ export const deleteAgent = (id) =>
 // Third Parties
 export const getThirdParties = () =>
   fetch(`${BASE}/third-parties`).then(r => r.json());
+
+export const updateThirdParty = (id, tp) =>
+  fetch(`${BASE}/third-parties/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(tp)
+  }).then(r => r.json());
 
 export const saveThirdParty = (tp) =>
   fetch(`${BASE}/third-parties`, {
@@ -126,5 +174,97 @@ export const updateRate = (id, rate) =>
 
 export const deleteRate = (id) =>
   fetch(`${BASE}/rates/${id}`, {
+    method: 'DELETE'
+  }).then(r => r.json());
+
+  export async function getFloors() {
+  const res = await fetch(`${BASE}/floors`);
+  return await res.json();
+}
+
+export async function saveFloor(floor) {
+  const res = await fetch(
+    `${BASE}/floors`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(floor)
+    }
+  );
+
+  return await res.json();
+}
+
+export async function deleteFloor(id) {
+  await fetch(
+    `${BASE}/floors/${id}`,
+    {
+      method: 'DELETE'
+    }
+  );
+}
+
+export async function updateBooking(id, data) {
+
+  const response = await fetch(
+    `${BASE}/bookings/${id}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    }
+  );
+
+  const text = await response.text();
+
+  console.log('UPDATE RESPONSE =>', text);
+
+  return text ? JSON.parse(text) : {};
+}
+
+export const saveBooking = (booking) =>
+  fetch(`${BASE}/bookings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(booking)
+  }).then(r => r.json());
+
+  // Add this new export to api.js
+export const updateRoomFloor = (roomNo, floor) =>
+  fetch(`${BASE}/rooms/${roomNo}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      roomNo,          // room_no stays the same
+      category: null,  // will be merged server-side — see rooms.js fix below
+      floor,
+      _floorOnlyUpdate: true   // flag so backend knows
+    })
+  }).then(r => r.json());
+
+  // ── Special Dates ─────────────────────────────────────────────────────────────
+export const getSpecialDates = () =>
+  fetch(`${BASE}/special-dates`).then(r => r.json());
+
+export const saveSpecialDate = (data) =>
+  fetch(`${BASE}/special-dates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json());
+
+export const updateSpecialDate = (id, data) =>
+  fetch(`${BASE}/special-dates/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json());
+
+export const deleteSpecialDate = (id) =>
+  fetch(`${BASE}/special-dates/${id}`, {
     method: 'DELETE'
   }).then(r => r.json());

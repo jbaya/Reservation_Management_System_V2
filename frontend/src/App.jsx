@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { addMonths, subMonths, format } from 'date-fns';
+import { addMonths, subMonths, format, addDays } from 'date-fns';
 
 // ── Components ─────────────────────────────────────────────────────────────────
 import CalendarView from './components/CalendarView.jsx';
@@ -8,19 +8,22 @@ import DncManager from './components/DncManager';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 import { AUTO_COLORS, initialCategoryColors } from './constants/colors.js';
-import { sampleBookings, initialRooms, initialThirdParties } from './constants/rooms.js';
+import { initialThirdParties } from './constants/rooms.js';// add to existing import line
+
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 import { sortRoomList } from './utils/roomUtils.js';
 import {
   getCategories,
   saveCategory,
+  getBookings,
   updateCategory,
   deleteCategory,
 getRooms,
 getAllRoomNumbers,
 saveRoom,
 deleteRoom,
+updateRoom,
   updateRoomCategory,
 
   getAgents,
@@ -36,7 +39,15 @@ saveSeason,
 updateSeason,
 deleteSeason,
 
-getRates
+getRates,
+
+getFloors,
+saveFloor,
+deleteFloor,
+
+ updateBooking,
+ saveBooking,
+ getSpecialDates
 
 } from './api.js';
 
@@ -53,6 +64,7 @@ import TravelAgentRateConfig from './pages/TravelAgentRateConfig.jsx';
 import SeasonConfigPage from './pages/SeasonConfigPage.jsx';
 import FloorPage from './pages/FloorPage.jsx';
 import Dashboard2 from './pages/Dashboard2.jsx';
+import SpecialDatesPage from './pages/SpecialDatesPage.jsx';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 /**
@@ -91,7 +103,7 @@ function App() {
   const [seasons,          setSeasons]           = useState([]);
   const [travelAgentRates, setTravelAgentRates]  = useState([]);
   const [thirdParties,     setThirdParties]      = useState(initialThirdParties);
-  const [bookings,         setBookings]          = useState(sampleBookings);
+  const [bookings, setBookings] = useState([]);
  const [rooms, setRooms] = useState([]);
 const [categoryColors, setCategoryColors] = useState({});
 
@@ -111,6 +123,7 @@ const [categoryColors, setCategoryColors] = useState({});
   const [editingBooking, setEditingBooking] = useState(null);
   const [modalOpen,      setModalOpen]      = useState(false);  // kept for future modal use
   const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [specialDates, setSpecialDates] = useState([]);
   const [blockForm,      setBlockForm]      = useState({ category: '', roomName: '', reason: '', arrival: '', departure: '' });
 
   // ── DNC override state ────────────────────────────────────────────────────
@@ -127,19 +140,7 @@ const [categoryColors, setCategoryColors] = useState({});
   const [dncAfterApprove, setDncAfterApprove] = useState(null);
 
   // ── Floors ────────────────────────────────────────────────────────────────
-  const [floors, setFloors] = useState(() =>
-    [...new Set(initialRooms.map(parseFloor))].sort((a, b) => a - b)
-  );
-
-  // Keep floors in sync when rooms change.
-  // This reconciles — stale floors that no longer have any room are removed.
-  useEffect(() => {
-    const activeFloors = [...new Set(rooms.map(parseFloor))].sort((a, b) => a - b);
-    setFloors(prev => {
-      const next = JSON.stringify(activeFloors);
-      return JSON.stringify(prev) === next ? prev : activeFloors;
-    });
-  }, [rooms]);
+const [floors, setFloors] = useState([]);
 
   // Re-sort rooms whenever the list length changes (e.g. add/delete).
   useEffect(() => {
@@ -209,6 +210,28 @@ getThirdParties()
     setTravelAgentRates(data || []);
   })
   .catch(console.error);
+
+  getBookings()
+  .then(data => {
+    console.log('BOOKINGS FROM DB =>', data);
+    setBookings(data || []);
+  })
+  .catch(console.error);
+
+  getFloors()
+  .then(data => {
+    if (data && data.length > 0) {
+      setFloors(
+        data.map(f => f.floorNo).sort((a,b) => a-b)
+      );
+    }
+  })
+  .catch(console.error);
+
+  getSpecialDates()
+  .then(data => setSpecialDates(data || []))
+  .catch(console.error);
+
 }, []);
 
   // ── Overlap check (single source of truth) ────────────────────────────────
@@ -299,41 +322,50 @@ getThirdParties()
   }, [normalizedBookings, rooms]);
 
   // ── Booking handlers ──────────────────────────────────────────────────────
-  const handleSaveBooking = useCallback((data) => {
-    // Multi-room bookings carry a `rooms[]` array; each room was already
-    // validated for overlap inside MultiRoomReservationPage.
-    // Single-room bookings are checked here against the canonical list.
-    if (!data.isMultiRoom && isOverlap(data, data.id)) {
-      alert('Room overlap! Please choose different dates or a different room.');
-      return;
+  const handleSaveBooking = useCallback(async (data) => {
+
+  if (!data.isMultiRoom && isOverlap(data, data.id)) {
+    alert('Room overlap! Please choose different dates or a different room.');
+    return;
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const isEdit = data.id && bookings.some(b => b.id === data.id);
+
+    if (isEdit) {
+      // ✅ Existing booking — PUT (update)
+      await updateBooking(data.id, {
+        ...data,
+        timestamp: now,
+      });
+    } else {
+      // ✅ New booking — POST (insert)
+      const bookingToSave = {
+        ...data,
+        id: data.id || `b${Date.now()}`,
+        timestamp: now,
+      };
+      await saveBooking(bookingToSave);
     }
 
-    const now = new Date().toISOString();
-
-    setBookings(prev => {
-      const exists = data.id && prev.find(b => b.id === data.id);
-      return exists
-        ? prev.map(b => b.id === data.id ? { ...b, ...data, timestamp: now } : b)
-        : [...prev, { ...data, id: data.id || `b${Date.now()}`, timestamp: now }];
-    });
+    // Fresh data reload
+    const freshBookings = await getBookings();
+    setBookings(freshBookings);
 
     setModalOpen(false);
     setEditingBooking(null);
     setActivePage(null);
     setShowCalendar(true);
-  }, [isOverlap]);
 
-  const handleUpdateBooking = useCallback((id, updates) => {
-    const cur = bookings.find(b => b.id === id);
-    if (!cur) return;
-    if (isOverlap({ ...cur, ...updates }, id)) {
-      alert('Overlap! Dates conflict with an existing booking.');
-      return;
-    }
-    setBookings(prev =>
-      prev.map(b => b.id === id ? { ...b, ...updates, timestamp: new Date().toISOString() } : b)
-    );
-  }, [bookings, isOverlap]);
+    console.log(isEdit ? '✅ Booking updated' : '✅ Booking saved');
+
+  } catch (err) {
+    console.error('❌ Booking save failed', err);
+    alert('Failed to save booking');
+  }
+
+}, [isOverlap, bookings]);
 
   // ── DNC handlers ──────────────────────────────────────────────────────────
   const requestDncOverride = useCallback((booking, targetRoom = null, afterApprove = null) => {
@@ -395,6 +427,32 @@ getThirdParties()
     setBookings(prev => [...prev, { ...data, id: `b${Date.now()}`, timestamp: new Date().toISOString() }]);
   }, [isOverlap]);
 
+const handleUpdateBooking = useCallback(async (id, updates) => {
+  try {
+    // ✅ Pehle existing booking dhundho
+    const existingBooking = bookings.find(b => b.id === id);
+    if (!existingBooking) {
+      console.error('Booking not found:', id);
+      return;
+    }
+
+    // ✅ Existing booking ke saath merge karo — null kabhi nahi aayega
+    const mergedBooking = {
+      ...existingBooking,
+      ...updates,
+    };
+
+    await updateBooking(id, mergedBooking);
+
+    const freshBookings = await getBookings();
+    setBookings(freshBookings);
+
+  } catch (err) {
+    console.error('Update booking failed', err);
+    alert('Failed to update booking');
+  }
+}, [bookings]);
+
   // ── Context-menu actions ──────────────────────────────────────────────────
   const handleContextAction = useCallback((action, booking) => {
     switch (action) {
@@ -434,47 +492,54 @@ getThirdParties()
     }
   }, [handleUpdateBooking]);
 
-  // ── Room / Category handlers ──────────────────────────────────────────────
- const handleAddCategory = useCallback(async (name, numRooms) => {
+  // ── In App.jsx — replace handleAddCategory ───────────────────────────────────
+const handleAddCategory = useCallback(async (name, roomCount, fromRoom = null, toRoom = null, floor = '1') => {
   const color = AUTO_COLORS[Object.keys(categoryColors).length % AUTO_COLORS.length];
   let newRooms = [];
 
-  if (numRooms && !isNaN(numRooms) && numRooms > 0) {
+  if (roomCount && !isNaN(roomCount) && roomCount > 0) {
     const allRoomNumbers = await getAllRoomNumbers();
+    const existingNumbers = new Set(allRoomNumbers.map(n => String(n)));
 
-const existingNumbers = allRoomNumbers
-  .map(n => parseInt(n))
-  .filter(n => !isNaN(n));
-
-let startNum =
-  existingNumbers.length > 0
-    ? Math.max(...existingNumbers) + 1
-    : 101;
-
-    for (let i = 0; i < numRooms; i++) {
-      let rn = String(startNum + i);
-      while (rooms.some(r => r.name === rn) || newRooms.some(r => r.name === rn)) {
-        startNum++;
-        rn = String(startNum + i);
+    if (fromRoom !== null && toRoom !== null) {
+      for (let num = fromRoom; num <= toRoom; num++) {
+        const rn = String(num);
+        if (existingNumbers.has(rn)) {
+          alert(`Room number ${rn} already exists. Choose a different range.`);
+          return;
+        }
+        newRooms.push({ name: rn, category: name, floor });
       }
-      newRooms.push({ name: rn, category: name, floor: '1' });
+    } else {
+      const parsedNumbers = allRoomNumbers
+        .map(n => parseInt(n, 10))
+        .filter(n => !isNaN(n));
+      let startNum = parsedNumbers.length > 0 ? Math.max(...parsedNumbers) + 1 : 101;
+
+      for (let i = 0; i < roomCount; i++) {
+        let rn = String(startNum + i);
+        while (rooms.some(r => r.name === rn) || newRooms.some(r => r.name === rn)) {
+          startNum++;
+          rn = String(startNum + i);
+        }
+        newRooms.push({ name: rn, category: name, floor });
+      }
     }
   }
 
   try {
-    // 1. Save category to DB
-    await saveCategory(name, numRooms || 0, color.border);
+    await saveCategory(name, roomCount || 0, color.border, floor); // pass floor
     console.log('✅ Category saved:', name);
 
-    // 2. Save each room to DB
     for (const room of newRooms) {
-      console.log('ROOM GOING TO DB =>', room);
       await saveRoom(room);
       console.log('✅ Room saved:', room.name);
     }
 
-    // 3. Update frontend state only after DB success
-    setCategoryColors(prev => ({ ...prev, [name]: color }));
+    setCategoryColors(prev => ({
+      ...prev,
+      [name]: { ...color, floor },
+    }));
     if (newRooms.length > 0) {
       setRooms(sortRoomList([...rooms, ...newRooms]));
     }
@@ -483,10 +548,9 @@ let startNum =
     console.error('❌ Save failed:', err);
     alert('Failed to save! Check console.');
   }
-
 }, [categoryColors, rooms]);
 
-const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoomCount) => {
+const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoomCount, newFloor) => {
   if (oldName !== newName && categoryColors[newName] !== undefined) {
     alert('Category already exists');
     return;
@@ -499,32 +563,49 @@ const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoo
   }
 
   try {
-    // 1. Category DB update
+    // 1. Update category in DB (name, count, color, floor)
     const allCats = await getCategories();
-    const catRow = allCats.find(r => r.category === oldName);
+    const catRow  = allCats.find(r => r.category === oldName);
     if (catRow) {
-      await updateCategory(catRow.id, newName, targetCount, newColor);
+      await updateCategory(catRow.id, newName, targetCount, newColor, newFloor);
       console.log('✅ Category updated');
     }
 
-    // 2. Rooms table mein category rename
-    if (oldName !== newName) {
-      await updateRoomCategory(oldName, newName);
-      console.log('✅ Rooms renamed');
+    // 2. Rename category on rooms AND update their floor in one call
+    if (oldName !== newName || newFloor) {
+      await updateRoomCategory(oldName, newName, newFloor);
+      console.log('✅ Rooms category + floor updated');
     }
 
-    // 3. Current rooms
-    const currentRooms = rooms.filter(r => r.category === oldName || r.category === newName);
+    // 3. Current rooms for THIS category
+    const currentRooms = rooms.filter(
+      r => r.category === oldName || r.category === newName
+    );
     const currentCount = currentRooms.length;
 
     // 4. ADD rooms if needed
     if (targetCount > currentCount) {
-      const existingNumbers = rooms.map(r => parseInt(r.name)).filter(n => !isNaN(n));
-      let nextNum = (existingNumbers.length > 0 ? Math.max(...existingNumbers) : 100) + 1;
+      // ✅ Use THIS category's own max room number, not global max
+      const catRoomNumbers = currentRooms
+        .map(r => parseInt(r.name, 10))
+        .filter(n => !isNaN(n))
+        .sort((a, b) => a - b);
+
+      let nextNum = catRoomNumbers.length > 0
+        ? Math.max(...catRoomNumbers) + 1
+        : 101;
+
+      const allRoomNames = new Set(rooms.map(r => r.name));
+
       for (let i = 0; i < targetCount - currentCount; i++) {
-        while (rooms.some(r => r.name === String(nextNum))) nextNum++;
-        await saveRoom({ name: String(nextNum), category: newName, floor: '1' });
+        while (allRoomNames.has(String(nextNum))) nextNum++;
+        await saveRoom({
+          name:     String(nextNum),
+          category: newName,
+          floor:    newFloor || '1',   // ✅ new rooms get correct floor
+        });
         console.log('✅ Room added:', nextNum);
+        allRoomNames.add(String(nextNum));
         nextNum++;
       }
     }
@@ -533,7 +614,9 @@ const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoo
     if (targetCount < currentCount) {
       const roomsToRemove = currentRooms.slice(targetCount).map(r => r.name);
       const hasActive = roomsToRemove.some(rn =>
-        bookings.some(b => b.roomName === rn && !['cancelled', 'no-show'].includes(b.status))
+        bookings.some(
+          b => b.roomName === rn && !['cancelled', 'no-show'].includes(b.status)
+        )
       );
       if (hasActive) {
         alert('Cannot reduce — some rooms have active bookings!');
@@ -545,7 +628,7 @@ const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoo
       }
     }
 
-    // 6. Frontend state update
+    // 6. Frontend categoryColors state
     const r = parseInt(newColor.slice(1, 3), 16);
     const g = parseInt(newColor.slice(3, 5), 16);
     const b = parseInt(newColor.slice(5, 7), 16);
@@ -553,15 +636,16 @@ const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoo
     setCategoryColors(prev => {
       const updated = { ...prev };
       updated[newName] = {
-        bg: `rgba(${r}, ${g}, ${b}, 0.18)`,
-        border: newColor,
+        bg:        `rgba(${r}, ${g}, ${b}, 0.18)`,
+        border:    newColor,
         num_rooms: targetCount,
+        floor:     newFloor,           // ✅ store floor in state too
       };
       if (oldName !== newName) delete updated[oldName];
       return updated;
     });
 
-    // 7. Fresh rooms DB se load karo
+    // 7. Reload fresh rooms from DB — floor_no will now be correct
     const freshRooms = await getRooms();
     setRooms(sortRoomList(freshRooms));
 
@@ -571,7 +655,6 @@ const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoo
     console.error('❌ Edit failed:', err);
     alert('Failed to update! Check console.');
   }
-
 }, [categoryColors, bookings, rooms]);
 
 const handleDeleteCategory = useCallback(async (name) => {
@@ -702,6 +785,36 @@ const handleDeleteCategory = useCallback(async (name) => {
 
 }, [bookings]);
 
+const handleUpdateRoom = useCallback(
+  async (oldRoomNo, updatedRoom) => {
+    try {
+
+      await updateRoom(oldRoomNo, {
+        roomNo: updatedRoom.roomNo,
+        category: updatedRoom.category,
+        floor: updatedRoom.floor,
+        capacity: updatedRoom.capacity || 2
+      });
+
+      const freshRooms = await getRooms();
+
+      setRooms(sortRoomList(freshRooms));
+
+      alert('Room updated successfully');
+
+    } catch (err) {
+
+      console.error(err);
+
+      alert(
+        err.message ||
+        'Room number already exists'
+      );
+    }
+  },
+  []
+);
+
   // ── Block room ────────────────────────────────────────────────────────────
   const handleBlockSubmit = useCallback((e) => {
     e.preventDefault();
@@ -749,6 +862,7 @@ const handleDeleteCategory = useCallback(async (name) => {
         { key: 'room-category',   label: 'Room Category' },
         { key: 'room-floor',      label: 'Floor' },
         { key: 'room-no',         label: 'Room No.' },
+        { key: 'special-dates', label: 'Special Dates' },
         { key: 'room-tariff',     label: 'View Tariff' },
         { key: 'room-edit-tariff',label: 'Edit Tariff' },
       ],
@@ -773,7 +887,7 @@ const handleDeleteCategory = useCallback(async (name) => {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f0f2f5', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f0f2f5', overflow: 'auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
 
       {/* ── Top Bar ── */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1a1a2e', padding: '0 18px', height: 48, flexShrink: 0, gap: 10, zIndex: 200 }}>
@@ -862,7 +976,7 @@ const handleDeleteCategory = useCallback(async (name) => {
       </header>
 
       {/* ── Main layout ── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'visible', position: 'relative' }}>
 
         {/* ── Sidebar ── */}
         <div style={{ width: sidebarOpen ? 240 : 0, minWidth: sidebarOpen ? 240 : 0, background: '#1e2a3a', transition: 'width 0.25s ease, min-width 0.25s ease', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column', zIndex: 100, boxShadow: sidebarOpen ? '4px 0 16px rgba(0,0,0,0.2)' : 'none' }}>
@@ -884,7 +998,7 @@ const handleDeleteCategory = useCallback(async (name) => {
               onClick={() => { setActivePage(null); setShowCalendar(true); setShowDashboard(false); setFloorFilter('all'); }}
               style={{ padding: '10px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, color: activePage === null ? '#64b5f6' : 'rgba(255,255,255,0.7)', background: activePage === null ? 'rgba(100,181,246,0.1)' : 'transparent', borderLeft: activePage === null ? '3px solid #64b5f6' : '3px solid transparent', fontSize: '0.85rem', fontWeight: activePage === null ? 700 : 500, transition: 'all 0.15s' }}
               onMouseEnter={e => { if (activePage !== null) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-              onMouseLeave={e => { if (activePage !== null) e.currentTarget.style.background = 'transparent'; }}
+              onMouseLeave={e => { if (activePage !== null) e.currentTarget.style.background = 'transparent'; }} 
             >
               🏠 <span>Home</span>
             </div>
@@ -1036,13 +1150,20 @@ const handleDeleteCategory = useCallback(async (name) => {
                     rooms={rooms}
                     bookings={filteredBookings}
                     selectedDate={selectedDate}
+                    specialDates={specialDates}
                     categoryColors={categoryColors}
-                    onCellClick={() => {
-                      setEditingBooking(null);
-                      setSidebarOpen(true);
-                      setExpandedMenu('reservation');
-                      setActivePage('new-reservation');
-                    }}
+                    onCellClick={(roomName, day) => {
+  setEditingBooking({
+    _prefill: true,
+    roomName: roomName,
+    roomCategory: rooms.find(r => r.name === roomName)?.category || '',
+    arrival: format(day, 'yyyy-MM-dd'),
+    departure: format(addDays(day, 1), 'yyyy-MM-dd'),
+  });
+  setSidebarOpen(true);
+  setExpandedMenu('reservation');
+  setActivePage('new-reservation');
+}}
                     onFullEdit={booking => {
                       setModalOpen(false);
                       setSidebarOpen(true);
@@ -1081,23 +1202,26 @@ const handleDeleteCategory = useCallback(async (name) => {
                 </span>
               </div>
 
-              {activePage === 'room-category' && (
-               <RoomCategoryPage
-  categoryColors={categoryColors}
-  rooms={rooms}
-  onAddCategory={handleAddCategory}
-  onDeleteCategory={handleDeleteCategory}
-  onEditCategory={handleEditCategory}
-/>
-              )}
+            {activePage === 'room-category' && (
+  <RoomCategoryPage
+    categoryColors={categoryColors}
+    rooms={rooms}
+    floors={floors}          
+    onAddCategory={handleAddCategory}
+    onDeleteCategory={handleDeleteCategory}
+    onEditCategory={handleEditCategory}
+  />
+)}
 
               {activePage === 'room-no' && (
                 <RoomNoPage
-                  rooms={rooms}
-                  categoryColors={categoryColors}
-                  onAddRoom={handleAddRoom}
-                  onDeleteRoom={handleDeleteRoom}
-                />
+  rooms={rooms}
+  floors={floors}
+  categoryColors={categoryColors}
+  onAddRoom={handleAddRoom}
+  onDeleteRoom={handleDeleteRoom}
+   onUpdateRoom={handleUpdateRoom}
+/>
               )}
 
               {activePage === 'new-reservation' && (
@@ -1182,6 +1306,13 @@ const handleDeleteCategory = useCallback(async (name) => {
                   categoryColors={categoryColors}
                 />
               )}
+
+              {activePage === 'special-dates' && (
+  <SpecialDatesPage
+    specialDates={specialDates}
+    onSpecialDatesChange={setSpecialDates}
+  />
+)}
 
               {activePage === 'cancel-list' && (
                 <div style={{ padding: 40, textAlign: 'center', color: '#aaa' }}>

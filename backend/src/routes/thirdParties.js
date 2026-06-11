@@ -21,6 +21,44 @@ router.post('/', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.put('/:id', async (req, res, next) => {
+  try {
+
+    const {
+      name,
+      company,
+      email,
+      mobile,
+      gst
+    } = req.body;
+
+    const { rows } = await db.query(
+      `UPDATE third_parties
+       SET
+         name = $1,
+         company = $2,
+         email = $3,
+         mobile = $4,
+         gst = $5
+       WHERE id = $6
+       RETURNING *`,
+      [
+        name,
+        company,
+        email,
+        mobile,
+        gst,
+        req.params.id
+      ]
+    );
+
+    res.json(rows[0]);
+
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.delete('/:id', async (req, res, next) => {
   try {
     await db.query('DELETE FROM third_parties WHERE id=$1', [req.params.id]);

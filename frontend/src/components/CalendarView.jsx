@@ -311,7 +311,13 @@ function BookingHoverPopup({ booking, rect }) {
         {[['Check-in', booking.arrival], ['Check-out', booking.departure]].map(([label, val], i) => (
           <div key={label} style={{ flex: 1, padding: '6px 10px', borderRight: i === 0 ? '1px solid #f0f0f0' : 'none' }}>
             <div style={{ color: '#392aaa', fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>{label}</div>
-            <div style={{ fontWeight: 700, color: '#1a1a2e', fontSize: '0.8rem' }}>{val}</div>
+            <div style={{ fontWeight: 700, color: '#1a1a2e', fontSize: '0.8rem' }}>{val
+  ? new Date(val).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    })
+  : '—'}</div>
           </div>
         ))}
       </div>
@@ -578,7 +584,8 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingDoub
   const barRef     = useRef(null);
   const hoverTimer = useRef(null);
 
-  const dep   = new Date(booking.departure);
+  const [dy, dm, dd] = (booking.departure || '').split('-').map(Number);
+const dep = new Date(dy, dm - 1, dd);
   const color = isBlocked(booking)
     ? statusColors.blocked
     : paymentTagColors[booking.paymentStatus] || paymentTagColors.due;
@@ -616,13 +623,19 @@ function BookingBar({ booking, cellWidth, cellHeight, left, width, onBookingDoub
         disableDragging
         enableResizing={{ left: false, right: true, top: false, bottom: false, topRight: false, bottomRight: false, bottomLeft: false, topLeft: false }}
         onResizeStop={(e, dir, ref, delta) => {
-          if (dir === 'right') {
-            const d = Math.round(delta.width / cellWidth);
-            if (d !== 0) {
-              onUpdateBooking(booking.id, { departure: format(addDays(dep, d), 'yyyy-MM-dd'), updatedAt: new Date().toISOString() });
-            }
-          }
-        }}
+  if (dir === 'right') {
+    const addedDays = Math.round(delta.width / cellWidth);
+    if (addedDays !== 0) {
+      const newDep = addDays(dep, addedDays);
+      const newDepStr = format(newDep, 'yyyy-MM-dd');
+      // ✅ Backend update + optimistic UI update
+      onUpdateBooking(booking.id, {
+        departure: newDepStr,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+}}
         style={{ zIndex: hovering || editing ? 5 : 2 }}
       >
         <div
@@ -707,6 +720,7 @@ function CalendarView({
   onContextAction,
   requestDncOverride,
   currentUser = 'Staff',
+  specialDates = [],
 }) {
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(window.innerWidth);
@@ -816,37 +830,134 @@ function CalendarView({
     return rows;
   }, [rooms, categoryColors]);
 
+  // ── Special date tag lookup ─────────────────────────────────────────────
+const specialDateMap = useMemo(() => {
+  const map = {};
+  specialDates.forEach(sd => {
+    const from = new Date(sd.from_date);
+    const to   = new Date(sd.to_date);
+    const cur  = new Date(from);
+    while (cur <= to) {
+      const key = format(cur, 'yyyy-MM-dd');
+      if (!map[key]) map[key] = [];
+      map[key].push({ name: sd.name, type: sd.type, color: sd.color });
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+  return map;
+}, [specialDates]);
+
   const hideScrollbar = { scrollbarWidth: 'none', msOverflowStyle: 'none' };
 
   // ── Render ──────────────────────────────────────────────────────────────
+  // Split layout state: top = calendar, bottom = category summary.
+  const [topHeight, setTopHeight] = useState(null); // in px
+  const dragState = useRef({ dragging: false, startY: 0, startHeight: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // default to ~78% of available container height
+    const h = Math.max(280, Math.round(el.clientHeight * 0.78));
+    setTopHeight(h);
+  }, []);
+
+  // Attach move/up handlers only during an active drag. This ensures
+  // listeners are added/removed for each drag session and remain
+  // available for subsequent drags (fixes single-use bug).
+  const startDrag = (e) => {
+    e.preventDefault();
+
+    const startY = e.touches ? e.touches[0].clientY : e.clientY;
+    const startHeight = topHeight || Math.round((containerRef.current?.clientHeight || 600) * 0.78);
+
+    // Move handler updates height live
+    const onMove = (ev) => {
+      ev.preventDefault && ev.preventDefault();
+      const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+      const dy = clientY - startY;
+      const newH = Math.max(120, Math.round(startHeight + dy));
+      setTopHeight(newH);
+    };
+
+    // Clean-up handler for end of drag
+    const onUp = () => {
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+  };
+
   return (
     <div
       ref={containerRef}
-      style={{ flex: 1, overflow: 'hidden', border: '1px solid #c8cacf', borderRadius: 6, background: '#fff', display: 'flex', flexDirection: 'column', height: '100%' }}
+      style={{ flex: 1, overflow: 'visible', border: '1px solid #c8cacf', borderRadius: 6, background: '#fff', display: 'flex', flexDirection: 'column', height: '100%' }}
     >
       <style>{`.cal-scroll::-webkit-scrollbar{display:none}`}</style>
 
-      <div className="cal-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', ...hideScrollbar }}>
-        <div style={{ width: '100%', minWidth: days.length * cellWidth + ROOM_COL_WIDTH }}>
+      {/* Top pane: calendar */}
+      <div style={{ height: topHeight || '78%', minHeight: 120, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="cal-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', ...hideScrollbar }}>
+          <div style={{ width: '100%', minWidth: days.length * cellWidth + ROOM_COL_WIDTH }}>
 
           {/* ── Column header ── */}
-          <div style={{ display: 'flex', height: 38, background: '#e8eaed', position: 'sticky', top: 0, zIndex: 1000, borderBottom: '2px solid #b8bcc4' }}>
+          <div style={{ display: 'flex', minHeight: 38, background: '#e8eaed', position: 'sticky', top: 0, zIndex: 1000, borderBottom: '2px solid #b8bcc4' }}>
             <div style={{ width: ROOM_COL_WIDTH, minWidth: ROOM_COL_WIDTH, borderRight: '2px solid #b8bcc4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.68rem', color: '#444', letterSpacing: '0.1em', textTransform: 'uppercase', background: '#e0e2e6' }}>
               Room
             </div>
-            {days.map(day => {
-              const isToday   = isSameDay(day, new Date());
-              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-              return (
-                <div
-                  key={day.toISOString()}
-                  style={{ width: cellWidth, minWidth: cellWidth, maxWidth: cellWidth, flexShrink: 0, borderRight: '1px solid #c4c8ce', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: isToday ? '#1565c0' : isWeekend ? '#fdecea' : '#e8eaed', color: isToday ? '#fff' : isWeekend ? '#c0392b' : '#333', fontWeight: isToday ? 800 : 600 }}
-                >
-                  <span style={{ fontSize: '0.7rem', lineHeight: 1.1 }}>{format(day, 'd')}</span>
-                  <span style={{ fontSize: '0.52rem', textTransform: 'uppercase', opacity: 0.75 }}>{format(day, 'EEE')}</span>
-                </div>
-              );
-            })}
+           {days.map(day => {
+  const isToday   = isSameDay(day, new Date());
+  const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+  const dateKey   = format(day, 'yyyy-MM-dd');
+  const specialTag = specialDateMap[dateKey]?.[0]; // take first matching tag
+
+  // Priority: today > special date > weekend > normal
+  const bg = isToday      ? '#1565c0'
+           : specialTag   ? specialTag.color + '22'   // light tinted bg like weekend
+           : isWeekend    ? '#fdecea'
+           : '#e8eaed';
+
+  const textColor = isToday    ? '#fff'
+                  : specialTag ? specialTag.color      // same color as the tag
+                  : isWeekend  ? '#c0392b'
+                  : '#333';
+
+  return (
+    <div
+      key={day.toISOString()}
+      title={specialTag ? specialTag.name : undefined}
+      style={{
+        width: cellWidth, minWidth: cellWidth, maxWidth: cellWidth,
+        flexShrink: 0,
+        borderRight: '1px solid rgba(0,0,0,0.18)',
+        textAlign: 'center',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: bg,
+        color: textColor,
+        fontWeight: isToday ? 800 : 600,
+      }}
+    >
+      <span style={{ fontSize: '0.7rem', lineHeight: 1.1 }}>
+        {format(day, 'd')}
+      </span>
+      <span style={{ fontSize: '0.52rem', textTransform: 'uppercase', opacity: 0.85 }}>
+        {specialTag && !isToday
+          ? (specialTag.name.length > 4 ? specialTag.name.slice(0, 4) + '…' : specialTag.name)
+          : format(day, 'EEE')
+        }
+      </span>
+    </div>
+  );
+})}
           </div>
 
           {/* ── Room rows + availability totals ── */}
@@ -859,10 +970,10 @@ function CalendarView({
               return (
                 <div
                   key={`room-${room.name}`}
-                  style={{ position: 'relative', height: cellHeight, display: 'flex', alignItems: 'stretch', borderBottom: '1px solid rgba(0,0,0,0.06)', background: roomColor.bg }}
+                  style={{ position: 'relative', height: cellHeight, display: 'flex', alignItems: 'stretch', borderBottom: '1px solid rgba(0,0,0,0.06)', background: roomColor.bg, color: '#1a1a2e' }}
                 >
                   {/* Room label */}
-                  <div style={{ width: ROOM_COL_WIDTH, minWidth: ROOM_COL_WIDTH, flexShrink: 0, borderRight: '3px solid #b8bcc4', display: 'flex', alignItems: 'center', borderLeft: `4px solid ${roomColor.border}`, paddingLeft: 8, background: roomColor.bg }}>
+                  <div style={{ width: ROOM_COL_WIDTH, minWidth: ROOM_COL_WIDTH, flexShrink: 0, borderRight: '3px solid #b8bcc4', display: 'flex', alignItems: 'center', borderLeft: `6px solid ${roomColor.border}`, paddingLeft: 8, background: 'rgba(255,255,255,0.08)' }}>
                     <span style={{ fontWeight: 700, fontSize: '0.74rem', color: '#1a1a2e' }}>{room.name}</span>
                   </div>
 
@@ -875,7 +986,7 @@ function CalendarView({
                       return (
                         <div
                           key={format(day, 'yyyy-MM-dd')}
-                          style={{ width: cellWidth, minWidth: cellWidth, maxWidth: cellWidth, height: '100%', flexShrink: 0, borderRight: '1px solid rgba(0,0,0,0.07)', cursor: occupied ? 'default' : 'pointer', zIndex: 1, background: isToday ? 'rgba(21,101,192,0.10)' : isWeekend ? 'rgba(0,0,0,0.04)' : 'transparent' }}
+                          style={{ width: cellWidth, minWidth: cellWidth, maxWidth: cellWidth, height: '100%', flexShrink: 0, borderRight: '1px solid rgba(0,0,0,0.18)', cursor: occupied ? 'default' : 'pointer', zIndex: 1, background: roomColor.bg }}
                           onClick={() => { if (!occupied) onCellClick(room.name, day); }}
                         />
                       );
@@ -921,9 +1032,9 @@ function CalendarView({
               return (
                 <div
                   key={`total-${cat}`}
-                  style={{ position: 'relative', height: 22, display: 'flex', alignItems: 'stretch', borderBottom: '2px solid #b8bcc4', background: `${roomColor.bg}cc` }}
+                  style={{ position: 'relative', height: 22, display: 'flex', alignItems: 'stretch', borderBottom: '2px solid rgba(0,0,0,0.16)', background: roomColor.bg }}
                 >
-                  <div style={{ width: ROOM_COL_WIDTH, minWidth: ROOM_COL_WIDTH, flexShrink: 0, borderRight: '3px solid #b8bcc4', display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: `4px solid ${roomColor.border}`, background: `${roomColor.bg}ee` }}>
+                  <div style={{ width: ROOM_COL_WIDTH, minWidth: ROOM_COL_WIDTH, flexShrink: 0, borderRight: '3px solid rgba(0,0,0,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: `6px solid ${roomColor.border}`, background: 'rgba(255,255,255,0.08)' }}>
                     <span style={{ fontSize: '0.6rem', fontWeight: 800, color: roomColor.border, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Available</span>
                   </div>
                   <div style={{ display: 'flex', flex: 1, position: 'relative', height: '100%' }}>
@@ -972,14 +1083,27 @@ function CalendarView({
             })}
           </div>
         </div>
+        </div>
       </div>
 
-      <CategoryMonthlySummary
-  rooms={allRooms || rooms}
-  bookings={bookings}
-  selectedDate={selectedDate}
-  categoryColors={categoryColors}
-/>
+      {/* Resizer bar */}
+      <div
+        onMouseDown={startDrag}
+        style={{ height: 8, cursor: 'row-resize', background: 'linear-gradient(90deg, transparent, rgba(0,0,0,0.03), transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        title="Drag to resize"
+      >
+        <div style={{ width: 48, height: 4, background: '#e0e0e0', borderRadius: 3 }} />
+      </div>
+
+      {/* Bottom pane: category summary */}
+      <div style={{ minHeight: 80, overflowY: 'auto' }}>
+        <CategoryMonthlySummary
+          rooms={allRooms || rooms}
+          bookings={bookings}
+          selectedDate={selectedDate}
+          categoryColors={categoryColors}
+        />
+      </div>
 
       {contextMenu && (
         <ContextMenu

@@ -7,8 +7,8 @@ const router = express.Router();
 router.get('/', async (req, res, next) => {
   try {
     const { rows } = await db.query(
-  'SELECT * FROM room_categories ORDER BY category'
-);
+      'SELECT * FROM room_categories ORDER BY category'
+    );
     res.json(rows);
   } catch (error) {
     next(error);
@@ -18,11 +18,11 @@ router.get('/', async (req, res, next) => {
 // POST - add category
 router.post('/', async (req, res, next) => {
   try {
-    const { category, num_rooms, color } = req.body;
+    const { category, num_rooms, color, floor } = req.body;
     const { rows } = await db.query(
-  'INSERT INTO room_categories (category, num_rooms, color) VALUES ($1, $2, $3) RETURNING *',
-  [category, num_rooms || 0, color]
-);
+      'INSERT INTO room_categories (category, num_rooms, color, floor) VALUES ($1, $2, $3, $4) RETURNING *',
+      [category, num_rooms || 0, color, floor || '1']
+    );
     res.status(201).json(rows[0]);
   } catch (error) {
     next(error);
@@ -32,11 +32,11 @@ router.post('/', async (req, res, next) => {
 // PUT - update category
 router.put('/:id', async (req, res, next) => {
   try {
-    const { category, num_rooms, color } = req.body;
-   const { rows } = await db.query(
-  'UPDATE room_categories SET category=$1, num_rooms=$2, color=$3 WHERE id=$4 RETURNING *',
-  [category, num_rooms, color, req.params.id]
-);
+    const { category, num_rooms, color, floor } = req.body;
+    const { rows } = await db.query(
+      'UPDATE room_categories SET category=$1, num_rooms=$2, color=$3, floor=$4 WHERE id=$5 RETURNING *',
+      [category, num_rooms, color, floor || '1', req.params.id]
+    );
     res.json(rows[0]);
   } catch (error) {
     next(error);
