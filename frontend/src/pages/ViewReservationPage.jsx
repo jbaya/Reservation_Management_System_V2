@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { resolveRate, calcTotals, canUserOverrideRates, applyRateOverride, resetRateOverride, BOOKING_SOURCES } from '../utils/Rateutil';
 import RateOverrideIndicator from '../components/RateOverrideIndicater';
+import { copyToClipboard, downloadCSV, printTable } from '../utils/tableExport';
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 const statusColor = (s) => {
@@ -10,6 +11,18 @@ const statusColor = (s) => {
 
 // ── Billing Modal ─────────────────────────────────────────────────────────────
 function BillingModal({ booking, rooms, onClose, onSaveBill, currentUser }) {
+  const formatDate = (dateStr) => {
+  if (!dateStr) return '—';
+
+  const [year, month, day] = dateStr.split('-');
+
+  const months = [
+    'Jan','Feb','Mar','Apr','May','Jun',
+    'Jul','Aug','Sep','Oct','Nov','Dec'
+  ];
+
+  return `${day} ${months[parseInt(month, 10) - 1]} ${year}`;
+};
   const loggedUser = typeof currentUser === 'object' ? currentUser : { name: currentUser || 'Admin', role: 'Admin' };
   const canOverride = canUserOverrideRates(loggedUser);
 
@@ -270,9 +283,24 @@ function BillingModal({ booking, rooms, onClose, onSaveBill, currentUser }) {
 
 // ── Main ViewReservationPage ──────────────────────────────────────────────────
 function ViewReservationPage({ bookings, rooms, categoryColors, currentUser, travelAgents = [], seasons = [], travelAgentRates = [], onUpdateBooking }) {
+  const formatDate = (dateStr) => {
+  if (!dateStr) return '—';
+
+  const [year, month, day] = dateStr.split('-');
+
+  const months = [
+    'Jan','Feb','Mar','Apr','May','Jun',
+    'Jul','Aug','Sep','Oct','Nov','Dec'
+  ];
+
+  return `${day} ${months[parseInt(month, 10) - 1]} ${year}`;
+};
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [billingBooking, setBillingBooking] = useState(null);
+
+
+
 
   const loggedUser = typeof currentUser === 'object' ? currentUser : { name: currentUser || 'Admin', role: 'Admin' };
 
@@ -315,8 +343,40 @@ function ViewReservationPage({ bookings, rooms, categoryColors, currentUser, tra
       {/* Controls */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         {['Copy', 'CSV', 'Print'].map(b => (
-          <button key={b} style={{ padding: '5px 14px', border: '1px solid #ddd', borderRadius: 5, background: '#f5f5f5', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, color: '#555' }}>{b}</button>
-        ))}
+  <button
+    key={b}
+    onClick={() => {
+      const columns = ['SR.', 'BOOKING ID', 'GUEST', 'ROOM', 'CATEGORY', 'CHECK-IN', 'CHECK-OUT', 'NIGHTS', 'STATUS', 'PAYMENT', 'AMOUNT'];
+      const rows = filtered.map((b, idx) => {
+        const nights = b.arrival && b.departure
+          ? Math.round((new Date(b.departure) - new Date(b.arrival)) / 86400000)
+          : '—';
+        const category = rooms.find(r => r.name === b.roomName)?.category
+          || (b.isMultiRoom ? 'Multi-Room' : '—');
+        return {
+          'SR.':        idx + 1,
+          'BOOKING ID': b.bookingId || '—',
+          'GUEST':      b.guestName,
+          'ROOM':       b.roomName || `${b.rooms?.length} rooms`,
+          'CATEGORY':   category,
+          'CHECK-IN':   b.arrival  ? formatDate(b.arrival)  : '—',
+          'CHECK-OUT':  b.departure? formatDate(b.departure): '—',
+          'NIGHTS':     nights,
+          'STATUS':     b.status,
+          'PAYMENT':    b.paymentStatus,
+          'AMOUNT':     b.totalAmount ? `₹${Number(b.totalAmount).toLocaleString('en-IN')}` : '—',
+        };
+      });
+
+      if (b === 'Copy')  copyToClipboard(rows, columns);
+      if (b === 'CSV')   downloadCSV(rows, columns, 'reservations.csv');
+      if (b === 'Print') printTable(rows, columns, 'Reservation Details');
+    }}
+    style={{ padding: '5px 14px', border: '1px solid #ddd', borderRadius: 5, background: '#f5f5f5', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, color: '#555' }}
+  >
+    {b}
+  </button>
+))}
         <select value={filter} onChange={e => setFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.78rem', cursor: 'pointer' }}>
           {['all', 'confirmed', 'tentative', 'checked-in', 'blocked'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -340,6 +400,8 @@ function ViewReservationPage({ bookings, rooms, categoryColors, currentUser, tra
     {filtered.length === 0 ? (
       <tr><td colSpan={13} style={{ padding: 24, textAlign: 'center', color: '#aaa', fontSize: '0.8rem' }}>No reservations found</td></tr>
     ) : filtered.map((b, idx) => {
+      console.log('ARRIVAL RAW =>', b.arrival);
+  console.log('DEPARTURE RAW =>', b.departure);
       const nights = b.arrival && b.departure ? Math.round((new Date(b.departure) - new Date(b.arrival)) / 86400000) : '—';
       const c = categoryColors[rooms.find(r => r.name === b.roomName)?.category] || { bg: '#f5f5f5', border: '#999' };
       const hasOverride = b.rooms?.some(r => r.isRateOverridden) || b.isRateOverridden;
@@ -368,12 +430,13 @@ function ViewReservationPage({ bookings, rooms, categoryColors, currentUser, tra
             </span>
           </td>
 
-          <td style={{ padding: '6px 8px', color: '#555', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
-            {b.arrival || '—'}
-          </td>
-          <td style={{ padding: '6px 8px', color: '#555', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
-            {b.departure || '—'}
-          </td>
+       <td style={{ padding: '6px 8px', color: '#555', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
+  {formatDate(b.arrival)}
+</td>
+
+<td style={{ padding: '6px 8px', color: '#555', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
+  {formatDate(b.departure)}
+</td>
 
           <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600 }}>{nights}</td>
 
@@ -422,9 +485,8 @@ function ViewReservationPage({ bookings, rooms, categoryColors, currentUser, tra
 
           <td style={{ padding: '6px 8px' }}>
             <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-              <button style={{ color: '#1565c0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700, padding: '2px 4px' }}>
-                EDIT
-              </button>
+             
+              
               <button
                 onClick={() => setBillingBooking(b)}
                 style={{ color: '#fff', background: '#1e8449', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700, padding: '3px 7px', whiteSpace: 'nowrap' }}>
@@ -442,8 +504,8 @@ function ViewReservationPage({ bookings, rooms, categoryColors, currentUser, tra
       <div style={{ marginTop: 12, fontSize: '0.78rem', color: '#888', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>Showing {filtered.length} of {bookings.length} reservations</span>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#f5f5f5', cursor: 'pointer', fontSize: '0.78rem' }}>Previous</button>
-          <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#f5f5f5', cursor: 'pointer', fontSize: '0.78rem' }}>Next</button>
+          <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#101010', cursor: 'pointer', fontSize: '0.78rem' }}>Previous</button>
+          <button style={{ padding: '4px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#1b1818', cursor: 'pointer', fontSize: '0.78rem' }}>Next</button>
         </div>
       </div>
 

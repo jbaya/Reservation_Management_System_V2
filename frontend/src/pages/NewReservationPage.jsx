@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import ReservationField from '../components/ReservationField';
 import MultiRoomReservationPage from './MultiRoomReservationPage';
+import { format, addDays } from 'date-fns';
 
 // Local Field helper
 function Field({ label, children, required }) {
@@ -15,10 +16,35 @@ function Field({ label, children, required }) {
 }
 
 const OTA_PLATFORMS = ['Booking.com', 'MakeMyTrip', 'Agoda', 'Expedia', 'Goibibo', 'Airbnb', 'Yatra', 'Other OTA'];
-
 function buildFormFromBooking(editingBooking) {
+
+  const formatDateForInput = (dateValue) => {
+    if (!dateValue) return '';
+
+    const d = new Date(dateValue);
+
+    return [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0')
+    ].join('-');
+  };
+
   return {
-    ...editingBooking,
+    // Guest info
+    guestName: editingBooking.guestName || '',
+    phone: editingBooking.phone || '',
+    email: editingBooking.email || '',
+    nationality: editingBooking.nationality || '',
+
+    // Dates
+    arrival: formatDateForInput(editingBooking.arrival),
+    departure: formatDateForInput(editingBooking.departure),
+
+    arrivalTime: editingBooking.arrivalTime || '12:00',
+    departureTime: editingBooking.departureTime || '10:00',
+
+    // Room
     rooms: editingBooking.rooms?.length
       ? editingBooking.rooms
       : [
@@ -30,6 +56,43 @@ function buildFormFromBooking(editingBooking) {
             rate: editingBooking.baseRate || 0,
           },
         ],
+
+    roomName: editingBooking.roomName || '',
+    roomCategory: editingBooking.roomCategory || '',
+
+    // Pax
+    numGuests: editingBooking.numGuests || 1,
+    numChildren: editingBooking.numChildren || 0,
+    childrenAges: editingBooking.childrenAges || [],
+
+    // Meal & Status
+    mealPlan: editingBooking.mealPlan || 'EP',
+    status: editingBooking.status || 'confirmed',
+
+    // Booking source
+    source: editingBooking.source || 'direct',
+    otaPlatform: editingBooking.otaPlatform || '',
+    bookingId: editingBooking.bookingId || '',
+    agentName: editingBooking.agentName || '',
+
+    // Rates
+    baseRate: editingBooking.baseRate || '',
+    extraChildCharge: editingBooking.extraChildCharge || 0,
+    extraBed: editingBooking.extraBed || 'None',
+    extraBedCharge: editingBooking.extraBedCharge || 0,
+
+    // Billing
+    discount: editingBooking.discount || 0,
+    advanceParticulars: editingBooking.advanceParticulars || 0,
+    advancePaymentType: editingBooking.advancePaymentType || 'None',
+    paidAmount: editingBooking.paidAmount || 0,
+    paymentStatus: editingBooking.paymentStatus || 'due',
+    paymentMode: editingBooking.paymentMode || '',
+    totalAmount: editingBooking.totalAmount || '',
+
+    // Additional
+    comments: editingBooking.comments || [],
+    tags: editingBooking.tags || [],
     dnc:
       editingBooking.dnc ||
       editingBooking.tags?.includes('DNC') ||
@@ -77,13 +140,30 @@ function NewReservationPage({
   const [editingCommentId, setEditingCommentId] = useState(null);
 
   // FIX: Re-initialize form when editingBooking prop changes (e.g. switching between bookings)
-  useEffect(() => {
-    if (editingBooking) {
-      setForm(buildFormFromBooking(editingBooking));
+useEffect(() => {
+  if (editingBooking) {
+    if (editingBooking._prefill) {
+      // Calendar cell click se aaya — sirf date + room prefill karo
+      setForm({
+        ...buildEmptyForm(),
+        arrival: editingBooking.arrival || '',
+        departure: editingBooking.departure || '',
+        rooms: [{
+          roomCategory: editingBooking.roomCategory || '',
+          roomName: editingBooking.roomName || '',
+          occupancy: 1,
+          extraPersons: 0,
+          rate: 0,
+        }],
+      });
     } else {
-      setForm(buildEmptyForm());
+      // Normal edit — poori booking load karo
+      setForm(buildFormFromBooking(editingBooking));
     }
-  }, [editingBooking?.id]);
+  } else {
+    setForm(buildEmptyForm());
+  }
+}, [editingBooking?.id, editingBooking?._prefill]);
 
   const handleChange = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
 
@@ -236,15 +316,180 @@ function NewReservationPage({
   const isPaymentModeMandatory = form.source === 'direct' || form.source === 'agent';
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const originalRoom =
-      editingBooking?.roomName ||
-      editingBooking?.rooms?.[0]?.roomName ||
-      '';
+  try {
+    // ════════════════════════════════════════════
+    // ✅ BLOCK 1 — Date Validations
+    // ════════════════════════════════════════════
+    if (!form.arrival || !form.departure) {
+      alert('❌ Check-In and Check-Out dates are required.');
+      return;
+    }
+
+    const arrivalDate   = new Date(form.arrival);
+    const departureDate = new Date(form.departure);
+    const today         = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (departureDate <= arrivalDate) {
+      alert('❌ Check-Out date must be after Check-In date.\nNegative or zero nights are not allowed.');
+      return;
+    }
+
+    const nightCount = Math.round((departureDate - arrivalDate) / 86400000);
+    if (nightCount < 1) {
+      alert('❌ Minimum stay is 1 night.');
+      return;
+    }
+
+    if (nightCount > 365) {
+      alert('❌ Maximum stay cannot exceed 365 nights.\nPlease verify the dates.');
+      return;
+    }
+
+    if (arrivalDate < today && !editingBooking) {
+      if (!window.confirm(`⚠️ Check-In date (${form.arrival}) is in the past.\nDo you want to continue?`)) {
+        return;
+      }
+    }
+
+    // ════════════════════════════════════════════
+    // ✅ BLOCK 2 — Guest Count Validations
+    // ════════════════════════════════════════════
+    const numGuests = parseInt(form.numGuests);
+    if (!numGuests || numGuests < 1) {
+      alert('❌ Number of guests must be at least 1.');
+      return;
+    }
+
+    if (numGuests > 20) {
+      alert('❌ Guest count cannot exceed 20.\nFor groups, please use Multi-Room Reservation.');
+      return;
+    }
+
+    const numChildren = parseInt(form.numChildren) || 0;
+    if (numChildren < 0) {
+      alert('❌ Number of children cannot be negative.');
+      return;
+    }
+
+    // ════════════════════════════════════════════
+    // ✅ BLOCK 3 — Rate & Billing Validations
+    // ════════════════════════════════════════════
+    const baseRate = parseFloat(form.baseRate);
+    if (form.source !== 'OTA') {
+      if (isNaN(baseRate) || baseRate < 0) {
+        alert('❌ Room rate cannot be negative.');
+        return;
+      }
+      if (baseRate === 0) {
+        if (!window.confirm('⚠️ Room rate is ₹0.\nIs this a complimentary stay? Do you want to continue?')) {
+          return;
+        }
+      }
+    }
+
+    const extraBedCharge = parseFloat(form.extraBedCharge) || 0;
+    if (extraBedCharge < 0) {
+      alert('❌ Extra bed charge cannot be negative.');
+      return;
+    }
+
+    const extraChildCharge = parseFloat(form.extraChildCharge) || 0;
+    if (extraChildCharge < 0) {
+      alert('❌ Extra child charge cannot be negative.');
+      return;
+    }
+
+    const discount = parseFloat(form.discount) || 0;
+    if (discount < 0) {
+      alert('❌ Discount cannot be negative.');
+      return;
+    }
+
+    const advance = parseFloat(form.advanceParticulars) || 0;
+    if (advance < 0) {
+      alert('❌ Advance payment cannot be negative.');
+      return;
+    }
+
+    const totalNum = parseFloat(totalCharges) || 0;
+    if (advance > totalNum && totalNum > 0) {
+      alert(`❌ Advance payment (₹${advance}) cannot exceed total charges (₹${totalNum}).`);
+      return;
+    }
+
+    // ════════════════════════════════════════════
+    // ✅ BLOCK 4 — Required Fields
+    // ════════════════════════════════════════════
+    if (
+      !form.guestName?.trim() ||
+      !form.rooms?.[0]?.roomName ||
+      !form.nationality
+    ) {
+      alert('❌ Please fill all required fields:\n• Guest Name\n• Room\n• Nationality');
+      return;
+    }
+
+    if (form.guestName.trim().length < 2) {
+      alert('❌ Guest name must be at least 2 characters.');
+      return;
+    }
+
+    if (form.phone && !/^[0-9+\-\s()]{7,15}$/.test(form.phone.trim())) {
+      alert('❌ Please enter a valid phone number (7–15 digits).');
+      return;
+    }
+
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      alert('❌ Please enter a valid email address.');
+      return;
+    }
+
+    // ════════════════════════════════════════════
+    // ✅ BLOCK 5 — Source-specific Validations
+    // ════════════════════════════════════════════
+    if (form.source === 'OTA' && !form.bookingId?.trim()) {
+      alert('❌ Booking ID is required for OTA reservations.');
+      return;
+    }
+
+    if (
+      form.bookingId &&
+      bookings.some(b =>
+        b.id !== editingBooking?.id &&
+        b.bookingId?.toUpperCase() === form.bookingId.toUpperCase()
+      )
+    ) {
+      alert('❌ Duplicate Booking ID not allowed.\nThis ID already exists in the system.');
+      return;
+    }
+
+    if (form.source === 'agent' && !form.agentName) {
+      alert('❌ Please select a Travel Agent for agent bookings.');
+      return;
+    }
+
+    // ════════════════════════════════════════════
+    // ✅ BLOCK 6 — Payment Validations
+    // ════════════════════════════════════════════
+    if (advance > 0 && form.advancePaymentType === 'None') {
+      alert('❌ Please select Advance Payment Type when advance amount is entered.');
+      return;
+    }
+
+    if (isPaymentModeMandatory && !form.paymentMode) {
+      alert('❌ Payment mode is required for Direct and Travel Agent bookings.');
+      return;
+    }
+
+    // ════════════════════════════════════════════
+    // ✅ BLOCK 7 — DNC Check
+    // ════════════════════════════════════════════
+    const originalRoom = editingBooking?.roomName || editingBooking?.rooms?.[0]?.roomName || '';
     const selectedRoom = form.rooms?.[0]?.roomName || '';
 
-    // DNC check first
     if (
       (editingBooking?.dnc || editingBooking?.tags?.includes('DNC') || form.dnc) &&
       originalRoom &&
@@ -264,7 +509,7 @@ function NewReservationPage({
               parseFloat(duePayment) <= 0 ? 'paid'
               : parseFloat(form.advanceParticulars || 0) > 0 ? 'partial'
               : 'due',
-            id: editingBooking.id,
+            id: editingBooking?.id,
             timestamp: new Date().toISOString(),
             comments: form.comments || [],
             dnc: form.dnc,
@@ -274,47 +519,9 @@ function NewReservationPage({
       return;
     }
 
-    // FIX: Required fields validation FIRST, then nested checks inside it
-    if (
-      !form.guestName ||
-      !form.arrival ||
-      !form.departure ||
-      !form.rooms[0].roomName ||
-      !form.nationality
-    ) {
-      alert('Please fill all required fields');
-      return;
-    }
-
-    // FIX: OTA-specific checks run after required fields pass (not nested inside them)
-    if (form.source === 'OTA' && !form.bookingId.trim()) {
-      alert('Booking ID is required for OTA reservations');
-      return;
-    }
-
-    if (
-      form.bookingId &&
-      bookings.some(b =>
-        b.id !== editingBooking?.id &&
-        b.bookingId?.toUpperCase() === form.bookingId.toUpperCase()
-      )
-    ) {
-      alert('Duplicate Booking ID not allowed');
-      return;
-    }
-
-    // Validate advance payment type
-    if (parseFloat(form.advanceParticulars || 0) > 0 && form.advancePaymentType === 'None') {
-      alert('Please select advance payment type');
-      return;
-    }
-
-    // Validate payment mode for mandatory sources
-    if (isPaymentModeMandatory && !form.paymentMode) {
-      alert('Payment mode is required for Direct and Travel Agent bookings.');
-      return;
-    }
-
+    // ════════════════════════════════════════════
+    // ✅ BLOCK 8 — Final Save
+    // ════════════════════════════════════════════
     onSave({
       ...form,
       roomName: form.rooms[0].roomName,
@@ -336,17 +543,39 @@ function NewReservationPage({
       setSuccess(false);
       setForm(p => ({
         ...p,
-        guestName: '', phone: '', email: '', arrival: '', departure: '',
-        roomName: '', roomCategory: '', agentName: '', otaPlatform: '', bookingId: '',
+        guestName: '', phone: '', email: '',
+        arrival: '', departure: '',
+        roomName: '', roomCategory: '',
+        agentName: '', otaPlatform: '', bookingId: '',
       }));
     }, 2000);
-  };
+
+  } catch (err) {
+    console.error('❌ Submit error:', err);
+    alert('An error occurred while saving the booking.');
+  }
+};
 
   const inp = {
     padding: '7px 10px', borderRadius: 5, border: '1px solid #ccc',
     fontSize: '0.82rem', width: '100%', boxSizing: 'border-box',
     outline: 'none', background: '#fff', color: '#1a1a2e',
   };
+
+  const dateInp = {
+  padding: '6px 9px',
+  borderRadius: 5,
+  border: '1px solid #ccc',
+  fontSize: '0.8rem',
+  width: '100%',
+  boxSizing: 'border-box',
+  outline: 'none',
+  background: '#fff',
+  color: '#1a1a2e',
+  cursor: 'pointer',
+  // Force calendar icon always visible
+  colorScheme: 'light',
+};
 
   if (success) return (
     <div style={{ padding: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
@@ -404,29 +633,43 @@ function NewReservationPage({
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
       <ReservationField label="Check-In Date" required>
         <input
-          type="date"
-          value={form.arrival}
-          onChange={(e) => {
-            const selectedDate = e.target.value;
-            setForm(p => ({ ...p, arrival: selectedDate }));
-            if (form.source === 'agent') {
-              autoApplyTravelAgentRate(form.agentName, form.rooms[0].roomCategory, selectedDate, false);
-            }
-          }}
-          onClick={(e) => e.target.showPicker?.()}
-          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', cursor: 'pointer' }}
-          required
-        />
+  type="date"
+  value={form.arrival}
+  onChange={(e) => {
+    const selectedDate = e.target.value;
+    setForm(p => {
+      const updated = { ...p, arrival: selectedDate };
+      if (p.departure && p.departure <= selectedDate) {
+        const nextDay = format(addDays(new Date(selectedDate), 1), 'yyyy-MM-dd');
+        updated.departure = nextDay;
+      }
+      return updated;
+    });
+    if (form.source === 'agent') {
+      autoApplyTravelAgentRate(form.agentName, form.rooms[0].roomCategory, selectedDate, false);
+    }
+  }}
+  style={{ ...inp, ...dateInp }}
+  required
+/>
       </ReservationField>
       <ReservationField label="Check-Out Date" required>
-        <input
-          type="date"
-          value={form.departure}
-          onChange={handleChange('departure')}
-          onClick={(e) => e.target.showPicker?.()}
-          style={{ ...inp, padding: '5px 8px', fontSize: '0.78rem', cursor: 'pointer' }}
-          required
-        />
+       {/* Check-Out Date */}
+<input
+  type="date"
+  value={form.departure}
+  min={form.arrival ? format(addDays(new Date(form.arrival), 1), 'yyyy-MM-dd') : ''}
+  onChange={(e) => {
+    const depDate = e.target.value;
+    if (form.arrival && depDate <= form.arrival) {
+      alert('❌ Check-Out must be after Check-In.');
+      return;
+    }
+    setForm(p => ({ ...p, departure: depDate }));
+  }}
+  style={{ ...inp, ...dateInp }}
+  required
+/>
       </ReservationField>
       <ReservationField label="No. Of Pax" required>
         <input type="number" min="1" value={form.numGuests} onChange={handleChange('numGuests')}

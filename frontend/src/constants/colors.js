@@ -1,16 +1,16 @@
 export const AUTO_COLORS = [
-  { bg: '#d5e8d4', border: '#27ae60' },
-  { bg: '#dae8fc', border: '#2980b9' },
-  { bg: '#e1d5e7', border: '#8e44ad' },
-  { bg: '#ffe6cc', border: '#e67e22' },
-  { bg: '#f8cecc', border: '#e74c3c' },
-  { bg: '#fff2cc', border: '#f39c12' },
-  { bg: '#d0e0e3', border: '#16a085' },
-  { bg: '#f5deb3', border: '#a0522d' },
+  { bg: 'rgba(31,97,141,0.55)', border: '#1f618d' },
+  { bg: 'rgba(25,111,81,0.55)', border: '#196f51' },
+  { bg: 'rgba(88,24,69,0.55)', border: '#581845' },
+  { bg: 'rgba(123,36,28,0.55)', border: '#7b241c' },
+  { bg: 'rgba(44,62,80,0.55)', border: '#2c3e50' },
+  { bg: 'rgba(143,60,97,0.55)', border: '#8f3c61' },
+  { bg: 'rgba(78,115,194,0.55)', border: '#4e73c2' },
+  { bg: 'rgba(75,82,113,0.55)', border: '#4b5271' },
 ];
 
 export const initialCategoryColors = {
-  'Royal Heritage': { bg: '#c18585', border: '#c0392b' },
-  'Heritage':       { bg: '#79a5c6', border: '#1565c0' },
-  'Suite':          { bg: '#956eba', border: '#6c3483' },
+  'Royal Heritage': { bg: 'rgba(121, 57, 57, 0.35)', border: '#793939' },
+  'Heritage':       { bg: 'rgba(23, 102, 133, 0.35)', border: '#176685' },
+  'Suite':          { bg: 'rgba(99, 39, 109, 0.35)', border: '#63276d' },
 };
