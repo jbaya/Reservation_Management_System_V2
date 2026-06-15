@@ -173,10 +173,12 @@ const [floors, setFloors] = useState([]);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // App.jsx mein — existing useEffects ke baad ye add karo
+  // Load all data — only when user is logged in
 useEffect(() => {
+  if (!loggedUser) return;   // ← skip if not authenticated
+
   getCategories().then(rows => {
-    if (rows && rows.length > 0) {
+    if (Array.isArray(rows) && rows.length > 0) {
       const colors = {};
       rows.forEach(row => {
         const hex = row.color || '#1565c0';
@@ -194,45 +196,44 @@ useEffect(() => {
   }).catch(console.error);
 
   getRooms().then(data => {
-    if (data && data.length > 0) {
+    if (Array.isArray(data) && data.length > 0) {
       setRooms(sortRoomList(data));
     }
   }).catch(console.error);
 
   getAgents()
   .then(data => {
-    setTravelAgents(data || []);
+    setTravelAgents(Array.isArray(data) ? data : []);
   })
   .catch(console.error);
 
-getThirdParties()
+  getThirdParties()
   .then(data => {
-    setThirdParties(data || []);
+    setThirdParties(Array.isArray(data) ? data : []);
   })
   .catch(console.error);
 
   getSeasons()
   .then(data => {
-    setSeasons(data || []);
+    setSeasons(Array.isArray(data) ? data : []);
   })
   .catch(console.error);
 
   getRates()
   .then(data => {
-    setTravelAgentRates(data || []);
+    setTravelAgentRates(Array.isArray(data) ? data : []);
   })
   .catch(console.error);
 
   getBookings()
   .then(data => {
-    console.log('BOOKINGS FROM DB =>', data);
-    setBookings(data || []);
+    setBookings(Array.isArray(data) ? data : []);
   })
   .catch(console.error);
 
   getFloors()
   .then(data => {
-    if (data && data.length > 0) {
+    if (Array.isArray(data) && data.length > 0) {
       setFloors(
         data.map(f => f.floorNo).sort((a,b) => a-b)
       );
@@ -241,10 +242,10 @@ getThirdParties()
   .catch(console.error);
 
   getSpecialDates()
-  .then(data => setSpecialDates(data || []))
+  .then(data => setSpecialDates(Array.isArray(data) ? data : []))
   .catch(console.error);
 
-}, []);
+}, [loggedUser]);
 
   // ── Overlap check (single source of truth) ────────────────────────────────
   /**
@@ -363,7 +364,7 @@ getThirdParties()
 
     // Fresh data reload
     const freshBookings = await getBookings();
-    setBookings(freshBookings);
+    setBookings(Array.isArray(freshBookings) ? freshBookings : []);
 
     setModalOpen(false);
     setEditingBooking(null);
@@ -457,7 +458,7 @@ const handleUpdateBooking = useCallback(async (id, updates) => {
     await updateBooking(id, mergedBooking);
 
     const freshBookings = await getBookings();
-    setBookings(freshBookings);
+    setBookings(Array.isArray(freshBookings) ? freshBookings : []);
 
   } catch (err) {
     console.error('Update booking failed', err);
