@@ -9,17 +9,14 @@ import thirdPartiesRouter from './routes/thirdParties.js';
 import seasonsRouter      from './routes/seasons.js';
 import ratesRouter        from './routes/rates.js';
 import floorsRoutes       from './routes/floors.js';
-import specialDatesRouter from './routes/special-dates.js';   // ← ADD THIS
+import specialDatesRouter from './routes/special-dates.js'; 
+import authRouter  from './routes/auth.js';   // ← ADD
+import usersRouter from './routes/users.js';  // ← ADD  // ← ADD THIS
 
 dotenv.config();
 const app = express();
 
-const corsOptions = {
-  origin: process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',')
-    : '*',
-};
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 
 app.use('/api/categories',    categoriesRouter);
@@ -30,7 +27,9 @@ app.use('/api/third-parties', thirdPartiesRouter);
 app.use('/api/seasons',       seasonsRouter);
 app.use('/api/rates',         ratesRouter);
 app.use('/api/floors',        floorsRoutes);
-app.use('/api/special-dates', specialDatesRouter);            // ← ADD THIS
+app.use('/api/special-dates', specialDatesRouter); 
+app.use('/api/auth',  authRouter);            // ← ADD
+app.use('/api/users', usersRouter);             // ← ADD THIS
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Backend chal raha hai! 🎉' });

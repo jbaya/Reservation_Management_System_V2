@@ -1,4 +1,4 @@
-const BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+const BASE = 'http://localhost:3001/api';
 
 export const getCategories = () =>
   fetch(`${BASE}/categories`).then(r => r.json());
@@ -178,13 +178,13 @@ export const deleteRate = (id) =>
   }).then(r => r.json());
 
   export async function getFloors() {
-  const res = await fetch(`${BASE}/floors`);
+  const res = await fetch('http://localhost:3001/api/floors');
   return await res.json();
 }
 
 export async function saveFloor(floor) {
   const res = await fetch(
-    `${BASE}/floors`,
+    'http://localhost:3001/api/floors',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -197,7 +197,7 @@ export async function saveFloor(floor) {
 
 export async function deleteFloor(id) {
   await fetch(
-    `${BASE}/floors/${id}`,
+    `http://localhost:3001/api/floors/${id}`,
     {
       method: 'DELETE'
     }
@@ -207,7 +207,7 @@ export async function deleteFloor(id) {
 export async function updateBooking(id, data) {
 
   const response = await fetch(
-    `${BASE}/bookings/${id}`,
+    `http://localhost:3001/api/bookings/${id}`,
     {
       method: 'PUT',
       headers: {
@@ -266,5 +266,50 @@ export const updateSpecialDate = (id, data) =>
 
 export const deleteSpecialDate = (id) =>
   fetch(`${BASE}/special-dates/${id}`, {
+    method: 'DELETE'
+  }).then(r => r.json());
+
+  // ── Auth ──────────────────────────────────────────────────────────────────────
+export const loginUser = (username, password, userType) =>
+  fetch(`${BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password, userType })
+  }).then(r => r.json());
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+export const getUsers = () =>
+  fetch(`${BASE}/users`).then(r => r.json());
+
+export const saveUser = (user) =>
+  fetch(`${BASE}/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(user)
+  }).then(r => r.json());
+
+export const updateUser = (id, user) =>
+  fetch(`${BASE}/users/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(user)
+  }).then(r => r.json());
+
+export const deleteUser = (id) =>
+  fetch(`${BASE}/users/${id}`, { method: 'DELETE' }).then(r => r.json());
+
+// ── Designations ──────────────────────────────────────────────────────────────
+export const getDesignations = () =>
+  fetch(`${BASE}/users/designations`).then(r => r.json());
+
+export const saveDesignation = (name) =>
+  fetch(`${BASE}/users/designations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  }).then(r => r.json());
+
+export const deleteDesignation = (id) =>
+  fetch(`${BASE}/users/designations/${id}`, {
     method: 'DELETE'
   }).then(r => r.json());

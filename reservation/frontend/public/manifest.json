@@ -1,0 +1,8 @@
+{
+  "name": "RMS Reservation System",
+  "short_name": "RMS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb"
+}
