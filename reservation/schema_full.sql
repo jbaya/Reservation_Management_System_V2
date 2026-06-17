@@ -128,8 +128,10 @@ CREATE TABLE IF NOT EXISTS public.travel_agent_rates (
 CREATE TABLE IF NOT EXISTS public.special_dates (
     id         serial NOT NULL,
     name       character varying(200) NOT NULL,
-    date       date NOT NULL,
     type       character varying(50),
+    from_date  date NOT NULL,
+    to_date    date NOT NULL,
+    color      character varying(20) DEFAULT '#e74c3c',
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT special_dates_pkey PRIMARY KEY (id)
 );
