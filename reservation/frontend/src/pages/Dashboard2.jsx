@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
   addDays,
   getDaysInMonth,
@@ -613,7 +613,7 @@ function YearlyBar({ item }) {
   );
 }
 // ── Main Component ────────────────────────────────────────────────────────────
-function Dashboard2({ rooms, bookings, selectedDate, categoryColors, onClose }) {
+function Dashboard2Impl({ rooms, bookings, selectedDate, categoryColors, onClose }) {
   const [viewDate,    setViewDate]    = useState(selectedDate || new Date());
   const [floorFilter, setFloorFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -917,5 +917,9 @@ function Dashboard2({ rooms, bookings, selectedDate, categoryColors, onClose }) 
     </div>
   );
 }
+
+// Wrapped in React.memo for the same reason as CalendarView — avoids a
+// full dashboard re-render on unrelated App state changes.
+const Dashboard2 = memo(Dashboard2Impl);
 
 export default Dashboard2;

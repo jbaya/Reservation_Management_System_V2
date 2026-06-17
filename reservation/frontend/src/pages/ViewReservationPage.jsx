@@ -400,8 +400,6 @@ function ViewReservationPage({ bookings, rooms, categoryColors, currentUser, tra
     {filtered.length === 0 ? (
       <tr><td colSpan={13} style={{ padding: 24, textAlign: 'center', color: '#aaa', fontSize: '0.8rem' }}>No reservations found</td></tr>
     ) : filtered.map((b, idx) => {
-      console.log('ARRIVAL RAW =>', b.arrival);
-  console.log('DEPARTURE RAW =>', b.departure);
       const nights = b.arrival && b.departure ? Math.round((new Date(b.departure) - new Date(b.arrival)) / 86400000) : '—';
       const c = categoryColors[rooms.find(r => r.name === b.roomName)?.category] || { bg: '#f5f5f5', border: '#999' };
       const hasOverride = b.rooms?.some(r => r.isRateOverridden) || b.isRateOverridden;

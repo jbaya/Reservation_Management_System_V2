@@ -707,7 +707,7 @@ const dep = new Date(dy, dm - 1, dd);
  * currentUser — name of the logged-in user, forwarded to comment threads
  *               so authorship is correct. Defaults to 'Staff' if omitted.
  */
-function CalendarView({
+function CalendarViewImpl({
   rooms,
   allRooms,
   bookings = [],
@@ -1117,5 +1117,11 @@ const specialDateMap = useMemo(() => {
     </div>
   );
 }
+
+// Wrapped in React.memo: this is the heaviest component in the app (full
+// month grid). Without this it re-renders on every App state change, e.g.
+// each keystroke in the top search box, even though its own props haven't
+// changed yet (search is debounced before it reaches `bookings`/filters).
+const CalendarView = React.memo(CalendarViewImpl);
 
 export default CalendarView;
