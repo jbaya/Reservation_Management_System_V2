@@ -508,37 +508,39 @@ const handleAddCategory = useCallback(async (name, roomCount, fromRoom = null, t
   const color = AUTO_COLORS[Object.keys(categoryColors).length % AUTO_COLORS.length];
   let newRooms = [];
 
-  if (roomCount && !isNaN(roomCount) && roomCount > 0) {
-    const allRoomNumbers = await getAllRoomNumbers();
-    const existingNumbers = new Set(allRoomNumbers.map(n => String(n)));
+  try {
+    if (roomCount && !isNaN(roomCount) && roomCount > 0) {
+      const allRoomNumbers = await getAllRoomNumbers();
+      const existingNumbers = new Set(
+        (Array.isArray(allRoomNumbers) ? allRoomNumbers : []).map(n => String(n))
+      );
 
-    if (fromRoom !== null && toRoom !== null) {
-      for (let num = fromRoom; num <= toRoom; num++) {
-        const rn = String(num);
-        if (existingNumbers.has(rn)) {
-          alert(`Room number ${rn} already exists. Choose a different range.`);
-          return;
+      if (fromRoom !== null && toRoom !== null) {
+        for (let num = fromRoom; num <= toRoom; num++) {
+          const rn = String(num);
+          if (existingNumbers.has(rn)) {
+            alert(`Room number ${rn} already exists. Choose a different range.`);
+            return;
+          }
+          newRooms.push({ name: rn, category: name, floor });
         }
-        newRooms.push({ name: rn, category: name, floor });
-      }
-    } else {
-      const parsedNumbers = allRoomNumbers
-        .map(n => parseInt(n, 10))
-        .filter(n => !isNaN(n));
-      let startNum = parsedNumbers.length > 0 ? Math.max(...parsedNumbers) + 1 : 101;
+      } else {
+        const parsedNumbers = [...existingNumbers]
+          .map(n => parseInt(n, 10))
+          .filter(n => !isNaN(n));
+        let startNum = parsedNumbers.length > 0 ? Math.max(...parsedNumbers) + 1 : 101;
 
-      for (let i = 0; i < roomCount; i++) {
-        let rn = String(startNum + i);
-        while (rooms.some(r => r.name === rn) || newRooms.some(r => r.name === rn)) {
-          startNum++;
-          rn = String(startNum + i);
+        for (let i = 0; i < roomCount; i++) {
+          let rn = String(startNum + i);
+          while (rooms.some(r => r.name === rn) || newRooms.some(r => r.name === rn)) {
+            startNum++;
+            rn = String(startNum + i);
+          }
+          newRooms.push({ name: rn, category: name, floor });
         }
-        newRooms.push({ name: rn, category: name, floor });
       }
     }
-  }
 
-  try {
     await saveCategory(name, roomCount || 0, color.border, floor); // pass floor
 
     for (const room of newRooms) {
