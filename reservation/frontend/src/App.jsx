@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { addMonths, subMonths, format, addDays } from 'date-fns';
 
 // ── Components ─────────────────────────────────────────────────────────────────
@@ -6,59 +6,26 @@ import CalendarView from './components/CalendarView.jsx';
 import Modal from './components/Modal.jsx';
 import DncManager from './components/DncManager';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-import { AUTO_COLORS, initialCategoryColors } from './constants/colors.js';
-import { initialThirdParties } from './constants/rooms.js';// add to existing import line
-
 import LoginPage from './pages/LoginPage.jsx';
 import UserPage  from './pages/UserPage.jsx';
 
-import {
-  Home, BedDouble, CalendarDays, Users, Settings,
-  Building2, ClipboardList, UserCog, Star, Hotel,
-  LogOut, LayoutDashboard, ShieldAlert, PlusCircle
-} from 'lucide-react';
+import { Home, LogOut } from 'lucide-react';
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+import { sidebarMenus } from './constants/sidebarMenus.jsx';
 
-// ── Utils ─────────────────────────────────────────────────────────────────────
-import { sortRoomList } from './utils/roomUtils.js';
-import {
-  getCategories,
-  saveCategory,
-  getBookings,
-  updateCategory,
-  deleteCategory,
-getRooms,
-getAllRoomNumbers,
-saveRoom,
-deleteRoom,
-updateRoom,
-  updateRoomCategory,
-
-  getAgents,
-  saveAgent,
-  deleteAgent,
-
-  getThirdParties,
-  saveThirdParty,
-  deleteThirdParty,
-
-  getSeasons,
-saveSeason,
-updateSeason,
-deleteSeason,
-
-getRates,
-
-getFloors,
-saveFloor,
-deleteFloor,
-
- updateBooking,
- saveBooking,
- getSpecialDates
-
-} from './api.js';
+// ── Hooks ─────────────────────────────────────────────────────────────────────
+// All data-fetching, mutation, and domain logic that used to live inline in
+// this component has been extracted into hooks. App.jsx is now responsible
+// only for wiring hooks together and rendering — no direct API calls here.
+import { useAuth } from './hooks/useAuth.js';
+import { useSearch } from './hooks/useSearch.js';
+import { useReferenceData } from './hooks/useReferenceData.js';
+import { useBookings } from './hooks/useBookings.js';
+import { useDncOverride } from './hooks/useDncOverride.js';
+import { useCategoryActions } from './hooks/useCategoryActions.js';
+import { useRoomActions } from './hooks/useRoomActions.js';
+import { useBlockRoom } from './hooks/useBlockRoom.js';
 
 // ── Pages ─────────────────────────────────────────────────────────────────────
 import RoomCategoryPage from './pages/RoomCategoryPage.jsx';
@@ -75,49 +42,15 @@ import FloorPage from './pages/FloorPage.jsx';
 import Dashboard2 from './pages/Dashboard2.jsx';
 import SpecialDatesPage from './pages/SpecialDatesPage.jsx';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-/**
- * Parse a room's floor value into a sortable integer.
- * Basement → -1, Ground → 0, numeric string → that number,
- * fallback derives from room name (e.g. "302" → floor 3).
- */
-function parseFloor(r) {
-  if (r.floor !== undefined && r.floor !== null && r.floor !== '') {
-    if (r.floor === 'Basement') return -1;
-    if (r.floor === 'Ground')   return 0;
-    const p = parseInt(r.floor);
-    if (!isNaN(p)) return p;
-  }
-  const n = parseInt(r.name);
-  if (isNaN(n) || n < 100) return 1;
-  return Math.floor(n / 100);
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════════════════════════
 function App() {
   // ── Auth ──────────────────────────────────────────────────────────────────
-  // Read once on mount; avoids JSON.parse on every render.
-  const [loggedUser, setLoggedUser] = useState(() => {
-  try {
-    const stored = localStorage.getItem('rms_loggedIn');
-    return stored ? JSON.parse(stored) : null;  // null = not logged in
-  } catch {
-    return null;
-  }
-});
+  const { loggedUser, login, logout } = useAuth();
 
-
-
-  // ── Core data ─────────────────────────────────────────────────────────────
-  const [travelAgents,     setTravelAgents]     = useState([]);
-  const [seasons,          setSeasons]           = useState([]);
-  const [travelAgentRates, setTravelAgentRates]  = useState([]);
-  const [thirdParties,     setThirdParties]      = useState(initialThirdParties);
-  const [bookings, setBookings] = useState([]);
- const [rooms, setRooms] = useState([]);
-const [categoryColors, setCategoryColors] = useState({});
+  // ── Search ────────────────────────────────────────────────────────────────
+  const { searchQuery, setSearchQuery, debouncedSearch, isSearching } = useSearch();
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [showCalendar,   setShowCalendar]   = useState(true);
@@ -125,9 +58,6 @@ const [categoryColors, setCategoryColors] = useState({});
   const [selectedDate,   setSelectedDate]   = useState(new Date());
   const [filterStatus,   setFilterStatus]   = useState('all');
   const [guestTagFilter, setGuestTagFilter] = useState('all');
-  const [searchQuery,    setSearchQuery]    = useState('');
-  const [debouncedSearch,setDebouncedSearch]= useState('');
-  const [isSearching,    setIsSearching]    = useState(false);
   const [sidebarOpen,    setSidebarOpen]    = useState(false);
   const [activePage,     setActivePage]     = useState(null);
   const [expandedMenu,   setExpandedMenu]   = useState(null);
@@ -135,334 +65,58 @@ const [categoryColors, setCategoryColors] = useState({});
   const [editingBooking, setEditingBooking] = useState(null);
   const [modalOpen,      setModalOpen]      = useState(false);  // kept for future modal use
   const [blockModalOpen, setBlockModalOpen] = useState(false);
-  const [specialDates, setSpecialDates] = useState([]);
-  const [blockForm,      setBlockForm]      = useState({ category: '', roomName: '', reason: '', arrival: '', departure: '' });
 
-  // ── DNC override state ────────────────────────────────────────────────────
-  const [dncOverrideOpen, setDncOverrideOpen] = useState(false);
-  const [dncBooking,      setDncBooking]      = useState(null);
-  const [dncTargetRoom,   setDncTargetRoom]   = useState(null);
-  /**
-   * Storing a function in state requires the () => fn pattern so React
-   * doesn't invoke it immediately as an updater. Always set via:
-   *   setDncAfterApprove(() => myCallback)
-   * and read via:
-   *   if (dncAfterApprove) dncAfterApprove()
-   */
-  const [dncAfterApprove, setDncAfterApprove] = useState(null);
+  // ── Reference data (categories, rooms, floors, agents, seasons, ...) ───────
+  const {
+    travelAgents,     setTravelAgents,
+    seasons,           setSeasons,
+    travelAgentRates,  setTravelAgentRates,
+    thirdParties,      setThirdParties,
+    rooms,             setRooms,
+    categoryColors,    setCategoryColors,
+    floors,            setFloors,
+    specialDates,      setSpecialDates,
+  } = useReferenceData(loggedUser);
 
-  // ── Floors ────────────────────────────────────────────────────────────────
-const [floors, setFloors] = useState([]);
+  // ── Bookings (data + overlap check + derived lists/stats + mutations) ─────
+  const {
+    bookings, setBookings,
+    isOverlap,
+    normalizedBookings,
+    filteredBookings,
+    stats: { activeToday, occupancyRate, pendingPayment, checkinsToday, checkoutsToday },
+    saveBooking: persistBooking,
+    updateBooking: handleUpdateBooking,
+    quickBook: handleQuickBook,
+  } = useBookings(loggedUser, rooms, { filterStatus, guestTagFilter, search: debouncedSearch });
 
-  // Re-sort rooms whenever the list length changes (e.g. add/delete).
-  useEffect(() => {
-    setRooms(prev => {
-      const sorted = sortRoomList(prev);
-      const same = sorted.every((r, i) => r.name === prev[i]?.name);
-      return same ? prev : sorted;
-    });
-  }, [rooms.length]);
+  // ── DNC override flow ───────────────────────────────────────────────────────
+  const {
+    dncOverrideOpen, dncBooking, dncTargetRoom,
+    requestDncOverride, handleDncApprove, handleDncCancel,
+  } = useDncOverride({ setBookings, loggedUser, onResolved: () => setActivePage(null) });
 
-  // ── Search debounce ───────────────────────────────────────────────────────
-  useEffect(() => {
-    setIsSearching(true);
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-      setIsSearching(false);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+  // ── Category / room CRUD ────────────────────────────────────────────────────
+  const { handleAddCategory, handleEditCategory, handleDeleteCategory } =
+    useCategoryActions({ categoryColors, setCategoryColors, rooms, setRooms, bookings });
 
-  // Load all data — only when user is logged in
-useEffect(() => {
-  if (!loggedUser) return;   // ← skip if not authenticated
+  const { handleAddRoom, handleDeleteRoom, handleUpdateRoom } =
+    useRoomActions({ bookings, setRooms });
 
-  getCategories().then(rows => {
-    if (Array.isArray(rows) && rows.length > 0) {
-      const colors = {};
-      rows.forEach(row => {
-        const hex = row.color || '#1565c0';
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        colors[row.category] = {
-          bg: `rgba(${r}, ${g}, ${b}, 0.18)`,
-          border: hex,
-          num_rooms: row.num_rooms
-        };
-      });
-      setCategoryColors(colors);
-    }
-  }).catch(console.error);
+  // ── Block room ───────────────────────────────────────────────────────────────
+  const { blockForm, setBlockForm, handleBlockSubmit } =
+    useBlockRoom({ isOverlap, setBookings, onBlocked: () => setBlockModalOpen(false) });
 
-  getRooms().then(data => {
-    if (Array.isArray(data) && data.length > 0) {
-      setRooms(sortRoomList(data));
-    }
-  }).catch(console.error);
-
-  getAgents()
-  .then(data => {
-    setTravelAgents(Array.isArray(data) ? data : []);
-  })
-  .catch(console.error);
-
-  getThirdParties()
-  .then(data => {
-    setThirdParties(Array.isArray(data) ? data : []);
-  })
-  .catch(console.error);
-
-  getSeasons()
-  .then(data => {
-    setSeasons(Array.isArray(data) ? data : []);
-  })
-  .catch(console.error);
-
-  getRates()
-  .then(data => {
-    setTravelAgentRates(Array.isArray(data) ? data : []);
-  })
-  .catch(console.error);
-
-  getBookings()
-  .then(data => {
-    setBookings(Array.isArray(data) ? data : []);
-  })
-  .catch(console.error);
-
-  getFloors()
-  .then(data => {
-    if (Array.isArray(data) && data.length > 0) {
-      setFloors(
-        data.map(f => f.floorNo).sort((a,b) => a-b)
-      );
-    }
-  })
-  .catch(console.error);
-
-  getSpecialDates()
-  .then(data => setSpecialDates(Array.isArray(data) ? data : []))
-  .catch(console.error);
-
-}, [loggedUser]);
-
-  // ── Overlap check (single source of truth) ────────────────────────────────
-  /**
-   * Returns true if newItem overlaps any existing booking for the same room.
-   * Pass ignoreId to exclude the booking being edited.
-   */
-  const isOverlap = useCallback((newItem, ignoreId = null) => {
-    const arr1 = new Date(newItem.arrival);
-    const dep1 = new Date(newItem.departure);
-    return bookings.some(b => {
-      if (b.roomName !== newItem.roomName) return false;
-      if (ignoreId && b.id === ignoreId)   return false;
-      const arr2 = new Date(b.arrival);
-      const dep2 = new Date(b.departure);
-      return arr1 < dep2 && arr2 < dep1 && !['cancelled', 'no-show'].includes(b.status);
-    });
-  }, [bookings]);
-
-  // ── Derived booking lists (memoized) ──────────────────────────────────────
-  /**
-   * Flatten multi-room bookings into one row per room so the calendar
-   * can render each room independently.
-   */
-  const normalizedBookings = useMemo(() =>
-    bookings.flatMap(b => {
-      if (b.rooms?.length) {
-        return b.rooms.map((room, idx) => ({
-          ...b,
-          roomName:      room.roomName,
-          roomCategory:  room.roomCategory,
-          occupancy:     room.occupancy     || 1,
-          extraPersons:  room.extraPersons  || 0,
-          baseRate:      room.rate || b.baseRate || 0,
-          dnc:           room.dnc           || false,
-          multiRoomIndex: idx + 1,
-        }));
-      }
-      return [{ ...b, dnc: b.tags?.includes('DNC') || false }];
-    }),
-  [bookings]);
-
-  const filteredBookings = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
-    return normalizedBookings.filter(b => {
-      const matchStatus = filterStatus === 'all' || b.status === filterStatus;
-      const matchTag =
-        guestTagFilter === 'all' ||
-        (guestTagFilter === 'VIP' && b.tags?.includes('VIP')) ||
-        (guestTagFilter === 'DNC' && b.tags?.includes('DNC'));
-
-      // Always hide cancelled from other status views
-      if (filterStatus !== 'cancelled' && b.status === 'cancelled') return false;
-
-      if (!q) return matchStatus && matchTag;
-
-      const haystack = [
-        b.guestName   || '',
-        b.bookingId   || '',
-        b.roomName    || '',
-        b.source      || '',
-        b.otaPlatform || '',
-      ].join(' ').toLowerCase();
-
-      return matchStatus && matchTag && haystack.includes(q);
-    });
-  }, [normalizedBookings, filterStatus, guestTagFilter, debouncedSearch]);
-
-  // ── Stats (memoized) ──────────────────────────────────────────────────────
-  const { activeToday, occupancyRate, pendingPayment, checkinsToday, checkoutsToday } = useMemo(() => {
-    const now     = new Date();
-    const todayStr = format(now, 'yyyy-MM-dd');
-    const valid   = normalizedBookings.filter(b => rooms.some(r => r.name === b.roomName));
-
-    const activeToday = valid.filter(b =>
-      new Date(b.arrival) <= now &&
-      new Date(b.departure) > now &&
-      !['cancelled', 'no-show', 'blocked'].includes(b.status)
-    );
-
-    return {
-      activeToday,
-      occupancyRate:   rooms.length > 0 ? Math.round((activeToday.length / rooms.length) * 100) : 0,
-      pendingPayment:  valid.filter(b => b.paymentStatus === 'due' || b.paymentStatus === 'partial').length,
-      checkinsToday:   valid.filter(b => b.arrival   === todayStr && !['cancelled', 'no-show', 'blocked'].includes(b.status)).length,
-      checkoutsToday:  valid.filter(b => b.departure === todayStr && !['cancelled', 'no-show', 'blocked'].includes(b.status)).length,
-    };
-  }, [normalizedBookings, rooms]);
-
-  // ── Booking handlers ──────────────────────────────────────────────────────
+  // ── Save booking (thin UI-nav wrapper around the hook mutation) ────────────
   const handleSaveBooking = useCallback(async (data) => {
-
-  if (!data.isMultiRoom && isOverlap(data, data.id)) {
-    alert('Room overlap! Please choose different dates or a different room.');
-    return;
-  }
-
-  try {
-    const now = new Date().toISOString();
-    const isEdit = data.id && bookings.some(b => b.id === data.id);
-
-    if (isEdit) {
-      // ✅ Existing booking — PUT (update)
-      await updateBooking(data.id, {
-        ...data,
-        timestamp: now,
-      });
-    } else {
-      // ✅ New booking — POST (insert)
-      const bookingToSave = {
-        ...data,
-        id: data.id || `b${Date.now()}`,
-        timestamp: now,
-      };
-      await saveBooking(bookingToSave);
+    const ok = await persistBooking(data);
+    if (ok) {
+      setModalOpen(false);
+      setEditingBooking(null);
+      setActivePage(null);
+      setShowCalendar(true);
     }
-
-    // Fresh data reload
-    const freshBookings = await getBookings();
-    setBookings(Array.isArray(freshBookings) ? freshBookings : []);
-
-    setModalOpen(false);
-    setEditingBooking(null);
-    setActivePage(null);
-    setShowCalendar(true);
-
-  } catch (err) {
-    console.error('❌ Booking save failed', err);
-    alert('Failed to save booking');
-  }
-
-}, [isOverlap, bookings]);
-
-  // ── DNC handlers ──────────────────────────────────────────────────────────
-  const requestDncOverride = useCallback((booking, targetRoom = null, afterApprove = null) => {
-    setDncBooking(booking);
-    setDncTargetRoom(targetRoom);
-    // () => afterApprove stores the function, not its return value.
-    setDncAfterApprove(() => afterApprove);
-    setDncOverrideOpen(true);
-  }, []);
-
-  const handleDncApprove = useCallback((payload) => {
-    const reason = typeof payload === 'string' ? payload : payload?.reason || '';
-    if (!reason.trim()) {
-      alert('Override reason is required');
-      return;
-    }
-
-    setBookings(prev =>
-      prev.map(b =>
-        b.id === dncBooking?.id
-          ? {
-              ...b,
-              roomName: dncTargetRoom?.name || b.roomName,
-              auditTrail: [
-                ...(b.auditTrail || []),
-                {
-                  action:       'DNC_OVERRIDE',
-                  admin:        loggedUser?.name || 'Admin',
-                  reason,
-                  previousRoom: b.roomName,
-                  newRoom:      dncTargetRoom?.name || b.roomName,
-                  timestamp:    new Date().toISOString(),
-                },
-              ],
-            }
-          : b
-      )
-    );
-
-    if (dncAfterApprove) dncAfterApprove();
-
-    setDncOverrideOpen(false);
-    setDncBooking(null);
-    setDncTargetRoom(null);
-    setDncAfterApprove(null);
-    setActivePage(null);
-  }, [dncBooking, dncTargetRoom, dncAfterApprove, loggedUser]);
-
-  const handleDncCancel = useCallback(() => {
-    setDncOverrideOpen(false);
-    setDncBooking(null);
-    setDncTargetRoom(null);
-    setDncAfterApprove(null);
-  }, []);
-
-  // ── Quick-book (from calendar cell click) ─────────────────────────────────
-  const handleQuickBook = useCallback((data) => {
-    if (isOverlap(data)) { alert('Room overlap!'); return; }
-    setBookings(prev => [...prev, { ...data, id: `b${Date.now()}`, timestamp: new Date().toISOString() }]);
-  }, [isOverlap]);
-
-const handleUpdateBooking = useCallback(async (id, updates) => {
-  try {
-    // ✅ Pehle existing booking dhundho
-    const existingBooking = bookings.find(b => b.id === id);
-    if (!existingBooking) {
-      console.error('Booking not found:', id);
-      return;
-    }
-
-    // ✅ Existing booking ke saath merge karo — null kabhi nahi aayega
-    const mergedBooking = {
-      ...existingBooking,
-      ...updates,
-    };
-
-    await updateBooking(id, mergedBooking);
-
-    const freshBookings = await getBookings();
-    setBookings(Array.isArray(freshBookings) ? freshBookings : []);
-
-  } catch (err) {
-    console.error('Update booking failed', err);
-    alert('Failed to update booking');
-  }
-}, [bookings]);
+  }, [persistBooking]);
 
   // ── Context-menu actions ──────────────────────────────────────────────────
   const handleContextAction = useCallback((action, booking) => {
@@ -503,345 +157,6 @@ const handleUpdateBooking = useCallback(async (id, updates) => {
     }
   }, [handleUpdateBooking]);
 
-  // ── In App.jsx — replace handleAddCategory ───────────────────────────────────
-const handleAddCategory = useCallback(async (name, roomCount, fromRoom = null, toRoom = null, floor = '1') => {
-  const color = AUTO_COLORS[Object.keys(categoryColors).length % AUTO_COLORS.length];
-  let newRooms = [];
-
-  try {
-    if (roomCount && !isNaN(roomCount) && roomCount > 0) {
-      const allRoomNumbers = await getAllRoomNumbers();
-      const existingNumbers = new Set(
-        (Array.isArray(allRoomNumbers) ? allRoomNumbers : []).map(n => String(n))
-      );
-
-      if (fromRoom !== null && toRoom !== null) {
-        for (let num = fromRoom; num <= toRoom; num++) {
-          const rn = String(num);
-          if (existingNumbers.has(rn)) {
-            alert(`Room number ${rn} already exists. Choose a different range.`);
-            return;
-          }
-          newRooms.push({ name: rn, category: name, floor });
-        }
-      } else {
-        const parsedNumbers = [...existingNumbers]
-          .map(n => parseInt(n, 10))
-          .filter(n => !isNaN(n));
-        let startNum = parsedNumbers.length > 0 ? Math.max(...parsedNumbers) + 1 : 101;
-
-        for (let i = 0; i < roomCount; i++) {
-          let rn = String(startNum + i);
-          while (rooms.some(r => r.name === rn) || newRooms.some(r => r.name === rn)) {
-            startNum++;
-            rn = String(startNum + i);
-          }
-          newRooms.push({ name: rn, category: name, floor });
-        }
-      }
-    }
-
-    await saveCategory(name, roomCount || 0, color.border, floor); // pass floor
-
-    for (const room of newRooms) {
-      await saveRoom(room);
-    }
-
-    setCategoryColors(prev => ({
-      ...prev,
-      [name]: { ...color, floor },
-    }));
-    if (newRooms.length > 0) {
-      setRooms(sortRoomList([...rooms, ...newRooms]));
-    }
-
-  } catch (err) {
-    console.error('❌ Save failed:', err);
-    alert('Failed to save! Check console.');
-  }
-}, [categoryColors, rooms]);
-
-const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoomCount, newFloor) => {
-  if (oldName !== newName && categoryColors[newName] !== undefined) {
-    alert('Category already exists');
-    return;
-  }
-
-  const targetCount = parseInt(newRoomCount);
-  if (isNaN(targetCount) || targetCount < 0) {
-    alert('Invalid room count');
-    return;
-  }
-
-  try {
-    // 1. Update category in DB (name, count, color, floor)
-    const allCats = await getCategories();
-    const catRow  = allCats.find(r => r.category === oldName);
-    if (catRow) {
-      await updateCategory(catRow.id, newName, targetCount, newColor, newFloor);
-    }
-
-    // 2. Rename category on rooms AND update their floor in one call
-    if (oldName !== newName || newFloor) {
-      await updateRoomCategory(oldName, newName, newFloor);
-    }
-
-    // 3. Current rooms for THIS category
-    const currentRooms = rooms.filter(
-      r => r.category === oldName || r.category === newName
-    );
-    const currentCount = currentRooms.length;
-
-    // 4. ADD rooms if needed
-    if (targetCount > currentCount) {
-      // ✅ Use THIS category's own max room number, not global max
-      const catRoomNumbers = currentRooms
-        .map(r => parseInt(r.name, 10))
-        .filter(n => !isNaN(n))
-        .sort((a, b) => a - b);
-
-      let nextNum = catRoomNumbers.length > 0
-        ? Math.max(...catRoomNumbers) + 1
-        : 101;
-
-      const allRoomNames = new Set(rooms.map(r => r.name));
-
-      for (let i = 0; i < targetCount - currentCount; i++) {
-        while (allRoomNames.has(String(nextNum))) nextNum++;
-        await saveRoom({
-          name:     String(nextNum),
-          category: newName,
-          floor:    newFloor || '1',   // ✅ new rooms get correct floor
-        });
-        allRoomNames.add(String(nextNum));
-        nextNum++;
-      }
-    }
-
-    // 5. DELETE rooms if needed
-    if (targetCount < currentCount) {
-      const roomsToRemove = currentRooms.slice(targetCount).map(r => r.name);
-      const hasActive = roomsToRemove.some(rn =>
-        bookings.some(
-          b => b.roomName === rn && !['cancelled', 'no-show'].includes(b.status)
-        )
-      );
-      if (hasActive) {
-        alert('Cannot reduce — some rooms have active bookings!');
-        return;
-      }
-      for (const rn of roomsToRemove) {
-        await deleteRoom(rn);
-      }
-    }
-
-    // 6. Frontend categoryColors state
-    const r = parseInt(newColor.slice(1, 3), 16);
-    const g = parseInt(newColor.slice(3, 5), 16);
-    const b = parseInt(newColor.slice(5, 7), 16);
-
-    setCategoryColors(prev => {
-      const updated = { ...prev };
-      updated[newName] = {
-        bg:        `rgba(${r}, ${g}, ${b}, 0.18)`,
-        border:    newColor,
-        num_rooms: targetCount,
-        floor:     newFloor,           // ✅ store floor in state too
-      };
-      if (oldName !== newName) delete updated[oldName];
-      return updated;
-    });
-
-    // 7. Reload fresh rooms from DB — floor_no will now be correct
-    const freshRooms = await getRooms();
-    setRooms(sortRoomList(freshRooms));
-
-    alert(`"${newName}" updated successfully`);
-
-  } catch (err) {
-    console.error('❌ Edit failed:', err);
-    alert('Failed to update! Check console.');
-  }
-}, [categoryColors, bookings, rooms]);
-
-const handleDeleteCategory = useCallback(async (name) => {
-  try {
-
-    // active booking check
-    const hasActiveBookings = bookings.some(
-      b =>
-        rooms.some(r => r.category === name && r.name === b.roomName) &&
-        !['cancelled', 'no-show'].includes(b.status)
-    );
-
-    if (hasActiveBookings) {
-      alert('Cannot delete category with active bookings');
-      return;
-    }
-
-    // get all categories from DB
-    const allCats = await getCategories();
-
-    // find category row
-    const catRow = allCats.find(c => c.category === name);
-
-    if (!catRow) {
-      alert('Category not found');
-      return;
-    }
-
-    // delete all rooms of this category from DB
-    const categoryRooms = rooms.filter(r => r.category === name);
-
-    for (const room of categoryRooms) {
-      await deleteRoom(room.name);
-    }
-
-    // delete category from DB
-    await deleteCategory(catRow.id);
-
-    // reload fresh DB data
-    const freshRooms = await getRooms();
-    const freshCategories = await getCategories();
-
-    // rebuild category colors
-    const colors = {};
-
-    freshCategories.forEach(row => {
-      const hex = row.color || '#1565c0';
-
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-
-      colors[row.category] = {
-        bg: `rgba(${r}, ${g}, ${b}, 0.18)`,
-        border: hex,
-        num_rooms: row.num_rooms
-      };
-    });
-
-    setCategoryColors(colors);
-    setRooms(sortRoomList(freshRooms));
-
-    alert(`"${name}" deleted successfully`);
-
-  } catch (err) {
-    console.error('❌ Delete failed:', err);
-    alert('Failed to delete category');
-  }
-}, [bookings, rooms]);
- const handleAddRoom = useCallback(async (room) => {
-  try {
-
-    await saveRoom({
-      name: room.name,
-      category: room.category,
-      floor: room.floor || '1',
-      capacity: room.capacity || 2
-    });
-
-    const freshRooms = await getRooms();
-
-    setRooms(sortRoomList(freshRooms));
-
-  } catch (err) {
-    console.error('❌ Save failed:', err);
-    alert('Failed to save room');
-  }
-}, []);
-
- const handleDeleteRoom = useCallback(async (name) => {
-
-  if (
-    bookings.some(
-      b =>
-        b.roomName === name &&
-        !['cancelled', 'no-show'].includes(b.status)
-    )
-  ) {
-    alert('Cannot delete room with active bookings');
-    return;
-  }
-
-  if (!window.confirm(`Delete room ${name}?`)) return;
-
-  try {
-
-    // delete from DB
-    await deleteRoom(name);
-
-    // reload rooms from DB
-    const freshRooms = await getRooms();
-
-    setRooms(sortRoomList(freshRooms));
-
-    alert(`Room ${name} deleted successfully`);
-
-  } catch (err) {
-    console.error('❌ Delete failed:', err);
-    alert('Failed to delete room');
-  }
-
-}, [bookings]);
-
-const handleUpdateRoom = useCallback(
-  async (oldRoomNo, updatedRoom) => {
-    try {
-
-      await updateRoom(oldRoomNo, {
-        roomNo: updatedRoom.roomNo,
-        category: updatedRoom.category,
-        floor: updatedRoom.floor,
-        capacity: updatedRoom.capacity || 2
-      });
-
-      const freshRooms = await getRooms();
-
-      setRooms(sortRoomList(freshRooms));
-
-      alert('Room updated successfully');
-
-    } catch (err) {
-
-      console.error(err);
-
-      alert(
-        err.message ||
-        'Room number already exists'
-      );
-    }
-  },
-  []
-);
-
-  // ── Block room ────────────────────────────────────────────────────────────
-  const handleBlockSubmit = useCallback((e) => {
-    e.preventDefault();
-    if (!blockForm.roomName || !blockForm.arrival || !blockForm.departure) return;
-
-    const newBlock = {
-      id:            `block-${Date.now()}`,
-      guestName:     blockForm.reason || 'Blocked',
-      roomName:      blockForm.roomName,
-      status:        'blocked',
-      arrival:       blockForm.arrival,
-      departure:     blockForm.departure,
-      paymentStatus: 'paid',
-      numGuests:     0,
-      mealPlan:      '—',
-      notes:         blockForm.reason,
-      timestamp:     new Date().toISOString(),
-      comments:      [],
-    };
-
-    if (isOverlap(newBlock)) { alert('Room overlap!'); return; }
-
-    setBookings(prev => [...prev, newBlock]);
-    setBlockModalOpen(false);
-    setBlockForm({ category: '', roomName: '', reason: '', arrival: '', departure: '' });
-  }, [blockForm, isOverlap]);
-
   // ── Derived UI data ───────────────────────────────────────────────────────
   const sortedCategories = useMemo(() =>
     Object.keys(categoryColors).sort(
@@ -854,50 +169,13 @@ const handleUpdateRoom = useCallback(
     [rooms]
   );
 
-  // ── Sidebar menu definition ───────────────────────────────────────────────
-const sidebarMenus = [
-  {
-    key: 'room',
-    label: 'Room Management',
-    icon: <BedDouble size={16} />,
-    children: [
-      { key: 'room-category',    label: 'Room Category',   icon: <Building2 size={14} /> },
-      { key: 'room-floor',       label: 'Floor',           icon: <Hotel size={14} /> },
-      { key: 'room-no',          label: 'Room No.',        icon: <BedDouble size={14} /> },
-      { key: 'special-dates',    label: 'Special Dates',   icon: <Star size={14} /> },
-      { key: 'room-tariff',      label: 'View Tariff',     icon: <ClipboardList size={14} /> },
-      { key: 'room-edit-tariff', label: 'Edit Tariff',     icon: <Settings size={14} /> },
-    ],
-  },
-  {
-    key: 'user-management',
-    label: 'User Management',
-    icon: <UserCog size={16} />,
-    children: [
-      { key: 'users', label: 'Users', icon: <Users size={14} /> },
-    ],
-  },
-  {
-    key: 'reservation',
-    label: 'Reservation',
-    icon: <CalendarDays size={16} />,
-    children: [
-      { key: 'new-reservation',       label: 'New Reservation',        icon: <PlusCircle size={14} /> },
-      { key: 'view-reservation',      label: 'View Reservation',       icon: <ClipboardList size={14} /> },
-      { key: 'cancel-list',           label: 'Cancel List',            icon: <ShieldAlert size={14} /> },
-      { key: 'travel-agent',          label: 'Travel Agent',           icon: <Users size={14} /> },
-      { key: 'season-config',         label: 'Season Configuration',   icon: <Settings size={14} /> },
-      { key: 'travel-agent-rate',     label: 'Agent Rate Config',      icon: <Settings size={14} /> },
-    ],
-  },
-];
   // ── Shared inline styles (kept minimal — move to CSS file when ready) ──────
   const btn = { padding: '6px 14px', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem' };
   const inp = { padding: '6px 9px', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box', outline: 'none' };
   const lbl = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.82rem', color: '#444' };
 
    if (!loggedUser) {
-    return <LoginPage onLoginSuccess={(user) => setLoggedUser(user)} />;
+    return <LoginPage onLoginSuccess={login} />;
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -905,8 +183,8 @@ const sidebarMenus = [
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f0f2f5', overflow: 'auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
 
       {/* ── Top Bar ── */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1a1a2e', padding: '0 18px', height: 48, flexShrink: 0, gap: 10, zIndex: 200 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <header className="topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1a1a2e', flexShrink: 0, zIndex: 200 }}>
+        <div className="topbar-left" style={{ display: 'flex', alignItems: 'center' }}>
           <button
             onClick={() => setSidebarOpen(p => !p)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '1.2rem', padding: '4px 6px', borderRadius: 5, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center' }}
@@ -967,7 +245,7 @@ const sidebarMenus = [
         </div>
 
         {showCalendar && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="topbar-right" style={{ display: 'flex', alignItems: 'center' }}>
             <button
               onClick={() => setShowDashboard(p => !p)}
               style={{ ...btn, background: showDashboard ? '#1e3a8a' : '#2563eb', color: '#fff', fontSize: '0.75rem', padding: '4px 12px', boxShadow: showDashboard ? '0 0 8px rgba(37,99,235,0.4)' : 'none' }}
@@ -991,10 +269,10 @@ const sidebarMenus = [
       </header>
 
       {/* ── Main layout ── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'visible', position: 'relative' }}>
+      <div className="main-layout" style={{ flex: 1, display: 'flex', overflow: 'visible', position: 'relative' }}>
 
         {/* ── Sidebar ── */}
-        <div style={{ width: sidebarOpen ? 240 : 0, minWidth: sidebarOpen ? 240 : 0, background: '#1e2a3a', transition: 'width 0.25s ease, min-width 0.25s ease', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column', zIndex: 100, boxShadow: sidebarOpen ? '4px 0 16px rgba(0,0,0,0.2)' : 'none' }}>
+        <div className="sidebar-panel" style={{ width: sidebarOpen ? 240 : 0, minWidth: sidebarOpen ? 240 : 0, background: '#1e2a3a', transition: 'width 0.25s ease, min-width 0.25s ease', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column', zIndex: 100, boxShadow: sidebarOpen ? '4px 0 16px rgba(0,0,0,0.2)' : 'none' }}>
           <div style={{ width: 240, flex: 1, overflowY: 'auto' }}>
 
             {/* User card */}
@@ -1066,11 +344,7 @@ const sidebarMenus = [
             {/* Logout */}
             <div style={{ marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.08)', padding: 16 }}>
               <button
-                onClick={() => {
-  localStorage.removeItem('rms_loggedIn');
-  setLoggedUser(null);  // ← add this line
-}}
-                
+                onClick={logout}
                 style={{ width: '100%', padding: '8px 0', border: '1px solid rgba(255,100,100,0.3)', borderRadius: 6, background: 'rgba(255,0,0,0.1)', color: '#ff8a80', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -1082,11 +356,11 @@ const sidebarMenus = [
         </div>
 
         {/* ── Main Content Area ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'all 0.25s ease' }}>
+        <div className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'all 0.25s ease' }}>
           {activePage === null ? (
             <>
               {/* Stats Bar */}
-              <div style={{ background: '#fff', borderBottom: '1px solid #e8eaed', padding: '6px 18px', display: 'flex', gap: 16, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
+              <div className="stats-bar" style={{ background: '#fff', borderBottom: '1px solid #e8eaed', display: 'flex', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
                 {[
                   { label: 'Occupied',        value: activeToday.length,  color: '#1e8449' },
                   { label: 'Occupancy Rate',  value: `${occupancyRate}%`, color: occupancyRate > 80 ? '#1e8449' : occupancyRate > 50 ? '#e67e22' : '#e74c3c' },
@@ -1164,7 +438,7 @@ const sidebarMenus = [
              
 
               {/* Calendar */}
-              <main style={{ flex: 1, padding: '8px 14px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <main className="calendar-main" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 {filteredBookings.length === 0 && debouncedSearch ? (
                   <div style={{ flex: 1, background: '#fff', border: '1px solid #ddd', borderRadius: 8, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#777', gap: 10 }}>
                     <div style={{ fontSize: '2rem' }}>🔍</div>
@@ -1216,7 +490,7 @@ const sidebarMenus = [
             /* ── Page views ── */
             <div style={{ flex: 1, overflowY: 'auto', background: '#f8f9fa' }}>
               {/* Breadcrumb */}
-              <div style={{ background: '#fff', borderBottom: '1px solid #e8eaed', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="page-breadcrumb" style={{ background: '#fff', borderBottom: '1px solid #e8eaed', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
                   onClick={() => setActivePage(null)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1565c0', fontSize: '0.82rem', fontWeight: 600, padding: 0 }}
@@ -1359,7 +633,7 @@ const sidebarMenus = [
 
       {/* ── Block Room Modal ── */}
       <Modal open={blockModalOpen} onClose={() => setBlockModalOpen(false)}>
-        <form onSubmit={handleBlockSubmit} style={{ width: 340, padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <form onSubmit={handleBlockSubmit} style={{ width: 'min(340px, 100%)', padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#7b241c' }}>🚫 Block Room</h3>
 
           <label style={lbl}>Category

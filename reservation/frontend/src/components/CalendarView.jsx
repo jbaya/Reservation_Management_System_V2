@@ -905,7 +905,7 @@ const specialDateMap = useMemo(() => {
 
       {/* Top pane: calendar */}
       <div style={{ height: topHeight || '78%', minHeight: 120, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div className="cal-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', ...hideScrollbar }}>
+        <div className="cal-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', ...hideScrollbar }}>
           <div style={{ width: '100%', minWidth: days.length * cellWidth + ROOM_COL_WIDTH }}>
 
           {/* ── Column header ── */}
