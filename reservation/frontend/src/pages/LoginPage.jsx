@@ -17,7 +17,7 @@ function LoginPage({ onLoginSuccess }) {
     setLoading(true);
     try {
       const res = await loginUser(form.username.trim(), form.password, form.userType);
-      if (res.success) {
+      if (res.token) {
         localStorage.setItem('rms_loggedIn', JSON.stringify({ ...res.user, token: res.token }));
         onLoginSuccess(res.user);
       } else {
