@@ -2,19 +2,16 @@
   "name": "rms-reservation-system",
   "private": true,
   "workspaces": [
-    "backend",
-    "frontend"
+    "reservation/backend",
+    "reservation/frontend"
   ],
   "scripts": {
-    "install": "npm install --workspace backend && npm install --workspace frontend",
-    "dev": "concurrently \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
-    "start": "npm run start --workspace backend",
-    "build": "npm run build --workspace frontend"
+    "install:all": "npm install --workspace reservation/backend && npm install --workspace reservation/frontend",
+    "dev": "concurrently \"npm run dev --workspace reservation/backend\" \"npm run dev --workspace reservation/frontend\"",
+    "start": "npm run start --workspace reservation/backend",
+    "build": "npm run build --workspace reservation/frontend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
-  },
-  "dependencies": {
-    "react-rnd": "^10.5.3"
   }
 }

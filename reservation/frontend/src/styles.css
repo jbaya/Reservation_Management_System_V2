@@ -22,280 +22,98 @@ textarea {
   font: inherit;
 }
 
-.app-shell {
-  padding: 24px;
-}
+/* ════════════════════════════════════════════════════════════════════════
+   Responsive layout rules for the app shell (App.jsx) and calendar grid
+   (CalendarView.jsx).
+   These classNames are real and present in the current component tree —
+   verified by grep before writing this file. Only properties that are NOT
+   already set inline are declared here, so nothing fights inline-style
+   specificity; the few exceptions are documented inline below.
+   Breakpoints: tablet <= 1024px, mobile <= 640px.
+   ════════════════════════════════════════════════════════════════════════ */
 
 .topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  padding: 0 18px;
+  gap: 10px;
+  min-height: 48px;
+  flex-wrap: nowrap;
 }
 
-.topbar h1 {
-  margin: 0;
-  font-size: 1.75rem;
-}
-
-.subtitle {
-  margin: 6px 0 0;
-  color: #475569;
-}
-
-.primary-button,
-.secondary-button {
-  border: none;
-  border-radius: 10px;
-  padding: 12px 18px;
-  cursor: pointer;
-}
-
-.primary-button {
-  background: #2563eb;
-  color: #fff;
-}
-
-.secondary-button {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.main-layout {
-  display: grid;
-  grid-template-columns: 2.2fr 1fr;
-  gap: 20px;
-}
-
-.calendar-panel {
-  background: #ffffff;
-  border-radius: 24px;
-  padding: 20px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-}
-
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
-.calendar-meta {
-  display: flex;
+.topbar-left {
   gap: 14px;
-  color: #475569;
+  flex-wrap: nowrap;
 }
 
-
-
-.calendar-outer {
-  width: 100%;
-  overflow-x: hidden;
-  display: flex;
-  justify-content: center;
-  background: #f8fafc;
-  border-radius: 18px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-  padding: 8px 0 18px 0;
+.topbar-right {
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-
-.calendar-grid {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+.stats-bar {
+  padding: 6px 18px;
+  gap: 16px;
 }
 
-.calendar-rows-vertical-scroll {
-  max-height: 60vh;
-  overflow-y: auto;
+.calendar-main {
+  padding: 8px 14px;
 }
 
-
-
-.calendar-row {
-  display: flex;
-  align-items: stretch;
-  width: 100%;
-  min-height: 48px;
+.page-breadcrumb {
+  padding: 10px 24px;
 }
 
+/* The calendar's own day-cell widths already shrink responsively in JS
+   (see CalendarView.jsx containerWidth/cellWidth via ResizeObserver) down
+   to a 26px floor; cal-scroll was switched to overflow-x:auto so any month
+   that still doesn't fit at the floor width scrolls instead of clipping. */
 
-.calendar-row-header {
-  position: sticky;
-  top: 0;
-  background: #f1f5f9;
-  z-index: 2;
-  border-bottom: 2px solid #e2e8f0;
-  min-height: 54px;
+@media (max-width: 1024px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 8px 14px;
+    min-height: 0;
+  }
+
+  .topbar-left {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Sidebar becomes a floating overlay instead of pushing the calendar
+     into a sliver of space. width/min-width/box-shadow stay inline
+     (App.jsx still toggles them via sidebarOpen) — only position is new
+     here, so there's no inline/CSS conflict. */
+  .sidebar-panel {
+    position: fixed;
+    top: 48px;
+    left: 0;
+    bottom: 0;
+    height: auto;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
+  }
 }
 
+@media (max-width: 640px) {
+  .topbar {
+    padding: 8px 10px;
+    gap: 8px;
+  }
 
+  .topbar h1 {
+    font-size: 0.85rem;
+  }
 
-.calendar-cell {
-  border: 1px solid #e2e8f0;
-  padding: 8px 2px;
-  min-width: 0;
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1 1 0;
-  word-break: break-word;
-  background: #fff;
-  transition: background 0.15s;
+  .stats-bar {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+
+  .calendar-main {
+    padding: 6px 8px;
+  }
+
+  .page-breadcrumb {
+    padding: 8px 14px;
+  }
 }
-.calendar-cell.day-cell:hover, .calendar-cell.day-cell:focus {
-  background: #e0e7ef;
-  outline: 2px solid #2563eb;
-  z-index: 1;
-}
-
-
-
-.room-cell {
-  min-width: 90px;
-  max-width: 120px;
-  background: #f1f5f9;
-  font-weight: 600;
-  flex: 0 0 100px;
-  color: #1e293b;
-  border-right: 2px solid #e2e8f0;
-}
-
-
-
-.date-cell {
-  flex-direction: column;
-  font-size: 0.92rem;
-  gap: 2px;
-  flex: 1 1 0;
-  min-width: 28px;
-  color: #2563eb;
-  font-weight: 500;
-  background: #f1f5f9;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.day-cell {
-  position: relative;
-  background: #ffffff;
-}
-
-.booking-card {
-  width: 100%;
-  border-radius: 14px;
-  border: none;
-  padding: 10px;
-  text-align: left;
-}
-
-.booking-card button {
-  width: 100%;
-}
-
-.booking-confirmed {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.booking-tentative {
-  background: #fef9c3;
-  color: #92400e;
-}
-
-.booking-cancelled {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.booking-due {
-  background: #fed7aa;
-  color: #7c2d12;
-}
-
-.booking-vip {
-  background: #ede9fe;
-  color: #5b21b6;
-}
-
-.booking-dnd {
-  background: #e2e8f0;
-  color: #1e293b;
-}
-
-.booking-label {
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.booking-meta {
-  font-size: 0.82rem;
-  opacity: 0.85;
-}
-
-.sidebar-panel {
-  display: grid;
-  gap: 20px;
-}
-
-.booking-form,
-.booking-summary {
-  background: #ffffff;
-  border-radius: 24px;
-  padding: 20px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-}
-
-.booking-form fieldset {
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 14px;
-  margin-bottom: 16px;
-}
-
-.booking-form legend {
-  padding: 0 8px;
-  font-weight: 700;
-}
-
-.booking-form input,
-.booking-form select,
-.booking-form textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  padding: 10px 12px;
-  margin-top: 10px;
-  margin-bottom: 8px;
-}
-
-.booking-form textarea {
-  min-height: 100px;
-  resize: vertical;
-}
-
-.form-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-  font-weight: 700;
-}
-
-
