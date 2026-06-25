@@ -28,7 +28,10 @@ router.post('/login', async (req, res, next) => {
     const user = rows[0];
 
     // Verify hashed password
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    const passwordMatch = await bcrypt.compare(
+  password,
+  user.password_hash
+);
     if (!passwordMatch) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }

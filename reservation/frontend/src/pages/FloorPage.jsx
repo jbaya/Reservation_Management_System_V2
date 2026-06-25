@@ -25,16 +25,30 @@ function FloorPage({
   };
 
   // ── KEY FIX: always use r.floor from DB, never derive from room name ──────
-  const getRoomFloor = (room) => {
-    // r.floor is set when saving a room — trust it completely
-    if (room.floor !== undefined && room.floor !== null && room.floor !== '') {
-      return String(room.floor);
+const getRoomFloor = (room) => {
+
+  if (room.floor) {
+
+    if (typeof room.floor === 'string') {
+
+      const match = room.floor.match(/\d+/);
+
+      if (match) {
+        return match[0];
+      }
     }
-    // Only fall back to name-derivation if floor was never stored
-    const n = parseInt(room.name);
-    if (!isNaN(n) && n >= 100) return String(Math.floor(n / 100));
-    return '1';
-  };
+
+    return String(room.floor);
+  }
+
+  const n = parseInt(room.name);
+
+  if (!isNaN(n) && n >= 100) {
+    return String(Math.floor(n / 100));
+  }
+
+  return '1';
+};
 
   const handleAddFloor = async (e) => {
     e.preventDefault();
@@ -65,7 +79,7 @@ function FloorPage({
     }
     if (!window.confirm(`Delete ${getFloorLabel(floorNum)}?`)) return;
     try {
-      await deleteFloorAPI(`floor-${floorNum}`);
+      await deleteFloorAPI(floorNum);
       setFloors(prev => prev.filter(f => f !== floorNum));
     } catch (err) {
       console.error(err);

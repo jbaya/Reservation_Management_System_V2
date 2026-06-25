@@ -31,10 +31,10 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { id, name, fromDate, toDate } = req.body;
+    const { name, fromDate, toDate } = req.body;
     const { rows } = await db.query(
-      'INSERT INTO seasons (id,name,from_date,to_date) VALUES ($1,$2,$3,$4) RETURNING *',
-      [id, name, fromDate, toDate]
+      'INSERT INTO seasons (name,from_date,to_date) VALUES ($1,$2,$3) RETURNING *',
+      [name, fromDate, toDate]
     );
     res.status(201).json(rows[0]);
   } catch (error) { next(error); }

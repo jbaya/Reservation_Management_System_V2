@@ -12,10 +12,10 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { id, name, company, email, mobile, gst } = req.body;
+    const { name, company, email, mobile, gst } = req.body;
     const { rows } = await db.query(
-      'INSERT INTO third_parties (id,name,company,email,mobile,gst) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-      [id, name, company, email, mobile, gst]
+      'INSERT INTO third_parties (name,company,email,mobile,gst) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [name, company, email, mobile, gst]
     );
     res.status(201).json(rows[0]);
   } catch (error) { next(error); }

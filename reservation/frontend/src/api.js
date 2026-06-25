@@ -17,17 +17,36 @@ const authHeaders = (extra = {}) => ({
 });
 
 const get  = (url) => fetch(url, { headers: authHeaders() }).then(r => r.json());
-const del  = (url) => fetch(url, { method: 'DELETE', headers: authHeaders() }).then(r => r.json());
+const del = async (url) => {
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Delete failed');
+  }
+
+  return data;
+};
 const post = (url, body) => fetch(url, { method: 'POST',  headers: authHeaders(), body: JSON.stringify(body) }).then(r => r.json());
 const put  = (url, body) => fetch(url, { method: 'PUT',   headers: authHeaders(), body: JSON.stringify(body) }).then(r => r.json());
 
 // ── Auth (public — no token needed) ──────────────────────────────────────────
-export const loginUser = (username, password, userType) =>
-  fetch(`${BASE}/auth/login`, {
+export const loginUser = async (username, password, userType) => {
+  const res = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password, userType }),
-  }).then(r => r.json());
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    return { success: false, error: data.error || 'Login failed' };
+  }
+  return data;
+};
 
 // ── Categories ────────────────────────────────────────────────────────────────
 export const getCategories  = ()                              => get(`${BASE}/categories`);

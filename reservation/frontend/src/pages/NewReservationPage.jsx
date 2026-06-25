@@ -63,7 +63,11 @@ function buildFormFromBooking(editingBooking) {
     // Pax
     numGuests: editingBooking.numGuests || 1,
     numChildren: editingBooking.numChildren || 0,
-    childrenAges: editingBooking.childrenAges || [],
+    childrenAges: Array.isArray(editingBooking.childrenAges)
+  ? editingBooking.childrenAges
+  : (typeof editingBooking.childrenAges === 'string'
+      ? JSON.parse(editingBooking.childrenAges || '[]')
+      : []),
 
     // Meal & Status
     mealPlan: editingBooking.mealPlan || 'EP',
@@ -86,7 +90,7 @@ function buildFormFromBooking(editingBooking) {
     advanceParticulars: editingBooking.advanceParticulars || 0,
     advancePaymentType: editingBooking.advancePaymentType || 'None',
     paidAmount: editingBooking.paidAmount || 0,
-    paymentStatus: editingBooking.paymentStatus || 'due',
+    paymentStatus: editingBooking.paymentStatus || 'pending',
     paymentMode: editingBooking.paymentMode || '',
     totalAmount: editingBooking.totalAmount || '',
 
@@ -112,7 +116,7 @@ function buildEmptyForm() {
     extraBed: 'None', extraBedCharge: 0,
     discount: 0,
     advanceParticulars: 0, advancePaymentType: 'None',
-    paidAmount: 0, paymentStatus: 'due',
+    paidAmount: 0, paymentStatus: 'pending',
     paymentMode: '',
     comments: [], tags: [],
     dnc: false,
@@ -228,7 +232,7 @@ useEffect(() => {
     setForm(p => ({ ...p, childrenAges: newAges }));
   };
 
-  const childrenAbove6 = (form.childrenAges || []).filter(a => !isNaN(parseInt(a)) && parseInt(a) > 6).length;
+  const childrenAbove6 = (Array.isArray(form.childrenAges) ? form.childrenAges : []).filter(a => !isNaN(parseInt(a)) && parseInt(a) > 6).length;
 
   // FIX: getSeasonForDate and autoApplyTravelAgentRate use useCallback and do NOT alert
   // during normal form filling — they return null silently if no match, and only alert
@@ -499,6 +503,7 @@ useEffect(() => {
         editingBooking,
         { name: selectedRoom },
         () => {
+          
           onSave({
             ...form,
             roomName: selectedRoom,
@@ -506,9 +511,9 @@ useEffect(() => {
             totalAmount: netAmount,
             balance: duePayment,
             paymentStatus:
-              parseFloat(duePayment) <= 0 ? 'paid'
-              : parseFloat(form.advanceParticulars || 0) > 0 ? 'partial'
-              : 'due',
+  parseFloat(duePayment) <= 0 ? 'paid'
+  : parseFloat(form.advanceParticulars || 0) > 0 ? 'partial'
+  : 'pending',
             id: editingBooking?.id,
             timestamp: new Date().toISOString(),
             comments: form.comments || [],
@@ -522,16 +527,25 @@ useEffect(() => {
     // ════════════════════════════════════════════
     // ✅ BLOCK 8 — Final Save
     // ════════════════════════════════════════════
+    
     onSave({
-      ...form,
-      roomName: form.rooms[0].roomName,
-      roomCategory: form.rooms[0].roomCategory,
+  ...form,
+
+  roomName: form.rooms[0].roomName,
+  roomCategory: form.rooms[0].roomCategory,
+
+categoryId:
+  form.rooms[0].roomCategory === 'prem.'
+    ? 3
+    : form.rooms[0].roomCategory === 'royal'
+    ? 4
+    : null,
       totalAmount: netAmount,
       balance: duePayment,
       paymentStatus:
         parseFloat(duePayment) <= 0 ? 'paid'
         : parseFloat(form.advanceParticulars || 0) > 0 ? 'partial'
-        : 'due',
+        : 'pending',
       id: editingBooking?.id || `b${Date.now()}`,
       timestamp: new Date().toISOString(),
       comments: form.comments || [],

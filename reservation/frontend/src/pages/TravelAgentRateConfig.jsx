@@ -15,7 +15,9 @@ function TravelAgentRateConfig({
 }) {
   const [form, setForm] = useState({
     agentName: '',
+    agentId: '',
     roomCategory: '',
+    categoryId: '',
     seasonId: '',
     roomRate: '',
     extraPersonRate: ''
@@ -71,13 +73,17 @@ function TravelAgentRateConfig({
     return;
   }
 
-  const payload = {
-    id: editingId || `rate-${Date.now()}`,
-    agentName: form.agentName,
-    roomCategory: form.roomCategory,
-    seasonId: form.seasonId,
-    seasonName: selectedSeason?.name || '',
-    roomRate: Number(form.roomRate),
+ const selectedAgent = agents.find(a => a.name === form.agentName);
+  const categoryEntry = Object.entries(categoryColors).find(([cat]) => cat === form.roomCategory);
+
+  if (!selectedAgent) { setError('Invalid agent selected'); return; }
+
+const payload = {
+    agentName:       form.agentName,
+    roomCategory:    form.roomCategory,
+    seasonId:        form.seasonId ? Number(form.seasonId) : null,
+    seasonName:      selectedSeason?.name || '',
+    roomRate:        Number(form.roomRate),
     extraPersonRate: Number(form.extraPersonRate || 0)
   };
 
@@ -200,12 +206,10 @@ function TravelAgentRateConfig({
       >
         <select
           value={form.agentName}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              agentName: e.target.value
-            })
-          }
+        onChange={(e) => {
+  const selected = agents.find(a => a.name === e.target.value);
+  setForm({ ...form, agentName: e.target.value, agentId: selected?.id || '' });
+}}
           style={inp}
         >
           <option value="">Select Travel Agent</option>

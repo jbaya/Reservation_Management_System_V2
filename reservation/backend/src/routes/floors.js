@@ -24,15 +24,33 @@ router.get('/', async (req, res, next) => {
 // ADD FLOOR
 router.post('/', async (req, res, next) => {
   try {
-    const { id, floorNo } = req.body;
+
+    const { floorNo } = req.body;
 
     const { rows } = await db.query(
-      'INSERT INTO floors (id, floor_no) VALUES ($1,$2) RETURNING *',
-      [id, floorNo]
+      `
+      INSERT INTO floors
+      (
+        floor_no,
+        label
+      )
+      VALUES
+      (
+        $1,
+        $2
+      )
+      RETURNING *
+      `,
+      [
+        floorNo,
+        `Floor ${floorNo}`
+      ]
     );
 
     res.status(201).json(rows[0]);
+
   } catch (err) {
+    console.error('ADD FLOOR ERROR:', err);
     next(err);
   }
 });

@@ -283,7 +283,7 @@ useEffect(() => {
           multiRoomIndex: idx + 1,
         }));
       }
-      return [{ ...b, dnc: b.tags?.includes('DNC') || false }];
+      return [{ ...b, dnc: b.dnc || b.tags?.includes('DNC') || false }];
     }),
   [bookings]);
 
@@ -371,7 +371,7 @@ useEffect(() => {
     setActivePage(null);
     setShowCalendar(true);
 
-    console.log(isEdit ? '✅ Booking updated' : '✅ Booking saved');
+    
 
   } catch (err) {
     console.error('❌ Booking save failed', err);
@@ -542,11 +542,11 @@ const handleAddCategory = useCallback(async (name, roomCount, fromRoom = null, t
 
   try {
     await saveCategory(name, roomCount || 0, color.border, floor); // pass floor
-    console.log('✅ Category saved:', name);
+    
 
     for (const room of newRooms) {
       await saveRoom(room);
-      console.log('✅ Room saved:', room.name);
+      
     }
 
     setCategoryColors(prev => ({
@@ -581,13 +581,13 @@ const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoo
     const catRow  = allCats.find(r => r.category === oldName);
     if (catRow) {
       await updateCategory(catRow.id, newName, targetCount, newColor, newFloor);
-      console.log('✅ Category updated');
+      
     }
 
     // 2. Rename category on rooms AND update their floor in one call
     if (oldName !== newName || newFloor) {
       await updateRoomCategory(oldName, newName, newFloor);
-      console.log('✅ Rooms category + floor updated');
+      
     }
 
     // 3. Current rooms for THIS category
@@ -617,7 +617,7 @@ const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoo
           category: newName,
           floor:    newFloor || '1',   // ✅ new rooms get correct floor
         });
-        console.log('✅ Room added:', nextNum);
+        
         allRoomNames.add(String(nextNum));
         nextNum++;
       }
@@ -637,7 +637,7 @@ const handleEditCategory = useCallback(async (oldName, newName, newColor, newRoo
       }
       for (const rn of roomsToRemove) {
         await deleteRoom(rn);
-        console.log('✅ Room deleted:', rn);
+        
       }
     }
 
@@ -701,13 +701,13 @@ const handleDeleteCategory = useCallback(async (name) => {
 
     for (const room of categoryRooms) {
       await deleteRoom(room.name);
-      console.log('✅ Room deleted:', room.name);
+      
     }
 
     // delete category from DB
     await deleteCategory(catRow.id);
 
-    console.log('✅ Category deleted');
+    
 
     // reload fresh DB data
     const freshRooms = await getRooms();
@@ -754,7 +754,7 @@ const handleDeleteCategory = useCallback(async (name) => {
 
     setRooms(sortRoomList(freshRooms));
 
-    console.log('✅ Room saved:', room.name);
+    
 
   } catch (err) {
     console.error('❌ Save failed:', err);
@@ -782,7 +782,7 @@ const handleDeleteCategory = useCallback(async (name) => {
     // delete from DB
     await deleteRoom(name);
 
-    console.log('✅ Room deleted:', name);
+    
 
     // reload rooms from DB
     const freshRooms = await getRooms();

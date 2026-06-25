@@ -13,7 +13,8 @@ function LoginPage({ onLoginSuccess }) {
     e.preventDefault();
     setError('');
     if (!form.username.trim()) { setError('Username is required'); return; }
-    if (!form.password.trim()) { setError('Password is required'); return; }
+if (!form.password.trim()) { setError('Password is required'); return; }
+if (!form.userType) { setError('Please select a role to login'); return; }
     setLoading(true);
     try {
       const res = await loginUser(form.username.trim(), form.password, form.userType);
