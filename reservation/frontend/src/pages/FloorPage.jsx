@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { saveFloor, deleteFloor as deleteFloorAPI } from '../api';
+import { saveFloor, deleteFloor as deleteFloorAPI, getFloors } from '../api';
 
 function FloorPage({
   floors,
@@ -48,7 +48,8 @@ function FloorPage({
       return;
     }
     try {
-      await saveFloor({ id: `floor-${num}`, floorNo: num });
+      // Backend requires a non-empty `label`, not a client-made `id`
+      await saveFloor({ floorNo: num, label: getFloorLabel(num) });
       setFloors(prev => [...prev, num].sort((a, b) => a - b));
       setNewFloor({ number: 1 });
     } catch (err) {
@@ -65,7 +66,17 @@ function FloorPage({
     }
     if (!window.confirm(`Delete ${getFloorLabel(floorNum)}?`)) return;
     try {
-      await deleteFloorAPI(`floor-${floorNum}`);
+      // `floors` only holds bare floor numbers — resolve the real DB id
+      // by re-fetching, same pattern App.jsx already uses for categories.
+      const allFloors = await getFloors();
+      const floorRow = Array.isArray(allFloors)
+        ? allFloors.find(f => f.floorNo === floorNum)
+        : null;
+      if (!floorRow) {
+        alert('Floor not found');
+        return;
+      }
+      await deleteFloorAPI(floorRow.id);
       setFloors(prev => prev.filter(f => f !== floorNum));
     } catch (err) {
       console.error(err);

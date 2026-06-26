@@ -4,7 +4,7 @@ const SELECT_WITH_JOINS = `
   SELECT
     tar.id, tar.room_rate, tar.extra_person_rate, tar.created_at,
     ta.id AS agent_id, ta.name AS agent_name,
-    rc.id AS category_id, rc.category AS category_name,
+    rc.id AS category_id, rc.category AS room_category,
     s.id AS season_id, s.name AS season_name, s.from_date, s.to_date
   FROM travel_agent_rates tar
   JOIN travel_agents ta ON ta.id = tar.agent_id

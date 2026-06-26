@@ -86,16 +86,11 @@ function SeasonConfigPage({
 
     } else {
 
-      const season = {
-        id: `season-${Date.now()}`,
-        ...form
-      };
-
-      await saveSeason(season);
+      const saved = await saveSeason(form);
 
       onSeasonsChange([
         ...seasons,
-        season
+        saved
       ]);
 
       setSuccess('Season added');

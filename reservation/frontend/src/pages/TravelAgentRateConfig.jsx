@@ -3,7 +3,8 @@ import {
   saveRate,
   updateRate,
   deleteRate,
-  getRates
+  getRates,
+  getCategories
 } from '../api.js';
 
 function TravelAgentRateConfig({
@@ -50,17 +51,13 @@ function TravelAgentRateConfig({
     return;
   }
 
-  const selectedSeason = seasons.find(
-    s => s.id === form.seasonId
-  );
-
   const duplicate = travelAgentRates.some(rate => {
     if (editingId && rate.id === editingId) return false;
 
     return (
       rate.agentName === form.agentName &&
       rate.roomCategory === form.roomCategory &&
-      rate.seasonId === form.seasonId
+      String(rate.seasonId) === String(form.seasonId)
     );
   });
 
@@ -71,12 +68,33 @@ function TravelAgentRateConfig({
     return;
   }
 
+  // Backend requires real numeric agentId/categoryId — the form only
+  // holds display names (from the dropdowns), so resolve the actual
+  // IDs the same way App.jsx already does for category edit/delete.
+  const agentRow = agents.find(a => a.name === form.agentName);
+  if (!agentRow) {
+    setError('Selected travel agent not found');
+    return;
+  }
+
+  let categoryRow;
+  try {
+    const allCategories = await getCategories();
+    categoryRow = allCategories.find(c => c.category === form.roomCategory);
+  } catch (err) {
+    console.error(err);
+    setError('Failed to resolve room category');
+    return;
+  }
+  if (!categoryRow) {
+    setError('Selected room category not found');
+    return;
+  }
+
   const payload = {
-    id: editingId || `rate-${Date.now()}`,
-    agentName: form.agentName,
-    roomCategory: form.roomCategory,
-    seasonId: form.seasonId,
-    seasonName: selectedSeason?.name || '',
+    agentId: Number(agentRow.id),
+    categoryId: Number(categoryRow.id),
+    seasonId: Number(form.seasonId),
     roomRate: Number(form.roomRate),
     extraPersonRate: Number(form.extraPersonRate || 0)
   };
